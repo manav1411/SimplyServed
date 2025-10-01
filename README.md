@@ -155,7 +155,7 @@ I do not expect many people to actually run this, it is more so a demonstration 
 ### Starting Services
 ```
 sudo systemctl restart server           # Flask server on port 8000 (dev alt to gunicorn->) # alt: python3 run.py
-sudo systemctl status server_gunicorn   # Gunicorn server on port 8000 (prod alt to flask^) # alt: 'gunicorn --bind 0.0.0.0:8000 "app:create_app()"'
+sudo systemctl restart server_gunicorn   # Gunicorn server on port 8000 (prod alt to flask^) # alt: 'gunicorn --bind 0.0.0.0:8000 "app:create_app()"'
 sudo systemctl restart cloudflared      # Cloudflare tunnel
 sudo systemctl restart nginx            # NGINX reverse proxy on port 5000
 sudo systemctl restart jackett          # Torrent indexer on port 9117

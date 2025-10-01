@@ -73,6 +73,13 @@ def landing_page():
             }
             movies.append(movie_info)
 
+    for movie_info in movies:
+        duration_seconds = movie_info["runtime"] * 60 if movie_info["runtime"] else 0
+        progress_seconds = movie_info["progress_seconds"] if movie_info["progress_seconds"] else 0
+        movie_info["progress_percent"] = min(progress_seconds / duration_seconds, 1) if duration_seconds > 0 else 0
+    movies.sort(key=lambda m: m["progress_percent"], reverse=True)
+
+
     # initialise searched_movies if not present
     if "searched_movies" not in session:
         session["searched_movies"] = []
@@ -116,7 +123,7 @@ def landing_page():
                         start_download(most_popular["id"])
                     except Exception as e:
                         current_app.logger.error(f"Auto-download failed: {e}")
-        return redirect(url_for("main.landing_page"))
+        return redirect(url_for("main.landing_page") + "#bottom")
 
     # passes session/user info to and returns the homepage html
     return render_template(

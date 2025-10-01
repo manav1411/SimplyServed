@@ -144,6 +144,9 @@ h1 {
   font-size: 12px;
   color: #f0f0f0;
 }
+.movie-info .genre:hover {
+  background: #666;
+}
 
 /* Runtime and rating styling */
 .movie-info .runtime-rating {
@@ -369,6 +372,11 @@ progress::-moz-progress-bar {
 }
 
 #controls-panel {
+  max-height: 80vh;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  box-sizing: border-box;
   position: fixed;
   bottom: 60px;
   right: 20px;
@@ -406,8 +414,56 @@ progress::-moz-progress-bar {
   cursor: pointer;
 }
 
+/* tag bar */
+#tag-filter-wrapper {
+  padding: 0 calc((100vw - 900px - 95px) / 2);
+  overflow: hidden;
+  margin: 8px 0;
+}
+#tag-filter-container {
+  margin: 8px 0;
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  white-space: nowrap;
+  -webkit-overflow-scrolling: touch;
+  gap: 5px;
+  justify-content: flex-start;
+  padding-bottom: 6px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+#tag-filter-container::-webkit-scrollbar {
+  display: none;
+}
+.tag-filter {
+  white-space: nowrap;
+  background-color: #333;
+  border: 1px solid #fff;
+  border-radius: 12px;
+  padding: 3px 10px;
+  font-size: 14px;
+  color: #f0f0f0;
+  cursor: pointer;
+  user-select: none;
+}
+.tag-filter:hover {
+  background: #666;
+}
+.tag-filter.active {
+  background-color: #cbcbcb;
+  color: #000;
+}
 
-/* Responsive tweaks */
+.movie[aria-expanded="true"] + .movie-info {
+  opacity: 1;
+  visibility: visible;
+  max-height: 1000px;
+}
+
+
+
+/* mobile settings */
 @media (max-width: 600px) {
   
     .movies {

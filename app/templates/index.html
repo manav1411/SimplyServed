@@ -1,13 +1,30 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <link rel="stylesheet" href="{{ url_for('static', filename='global.css') }}?v=22">
+    <link rel="stylesheet" href="{{ url_for('static', filename='global.css') }}?v=134">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Home</title>
 </head>
 <body>
   <div class="main-container">
     <h1 id="greeting"></h1>
+
+    <div id="tag-filter-wrapper">
+      <div id="tag-filter-container">
+        <span class="tag-filter" data-tag="all">All</span>
+        {% set all_genres = [] %}
+        {% for movie in movies %}
+          {% for genre in movie.genres %}
+            {% if genre not in all_genres %}
+              {% set _ = all_genres.append(genre) %}
+            {% endif %}
+          {% endfor %}
+        {% endfor %}
+        {% for genre in all_genres %}
+          <span class="tag-filter" data-tag="{{ genre }}">{{ genre }}</span>
+        {% endfor %}
+      </div>
+    </div>
 
     <div class="movies-wrapper">
       <div class="movies">
@@ -118,9 +135,7 @@
         <button id="reset-search-btn">Click Here</button>
       </p>
     </div>
-
-
-
+  <div id="bottom"></div>
   </div>
 
   <script>
@@ -137,6 +152,49 @@
       });
     });
   </script>
+
+
+  <script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+
+    document.querySelectorAll(".movie").forEach(movieDiv => {
+      const link = movieDiv.querySelector("a");
+      let tappedOnce = false;
+
+      if (isMobile) {
+        movieDiv.addEventListener("click", (e) => {
+          const expanded = movieDiv.getAttribute("aria-expanded") === "true";
+
+          if (!expanded) {
+            // First tap → expand instead of navigating
+            e.preventDefault();
+            movieDiv.setAttribute("aria-expanded", "true");
+            tappedOnce = true;
+            // scroll into view if you like
+            movieDiv.scrollIntoView({ behavior: "smooth", block: "start" });
+
+            // reset if they don't tap again within a few seconds
+            setTimeout(() => { tappedOnce = false; }, 2000);
+          } else if (tappedOnce) {
+            // Second tap → allow navigation
+            window.location.href = link.href;
+          }
+        });
+      } else {
+        // Desktop: normal expand on click (optional if hover covers it)
+        movieDiv.addEventListener("click", (e) => {
+          const expanded = movieDiv.getAttribute("aria-expanded") === "true";
+          movieDiv.setAttribute("aria-expanded", expanded ? "false" : "true");
+          if (!expanded) {
+            movieDiv.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        });
+      }
+    });
+  });
+  </script>
+
 
   <script>
     const name = "{{ user_name }}";
@@ -333,6 +391,76 @@
         });
       }
     });
+  </script>
+
+  <script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const tags = document.querySelectorAll(".tag-filter");
+    const movies = document.querySelectorAll(".movie-block");
+    const genresInMovies = document.querySelectorAll(".movie-info .genre");
+
+    function filterMoviesByGenre(selected) {
+      movies.forEach(movie => {
+        const genres = Array.from(movie.querySelectorAll(".genre")).map(el => el.textContent.trim());
+        if (selected === "all" || genres.includes(selected)) {
+          movie.style.display = "block";
+        } else {
+          movie.style.display = "none";
+        }
+      });
+    }
+
+  // Handle clicks on top tags with toggle behavior
+    tags.forEach(tag => {
+      tag.addEventListener("click", () => {
+        const selected = tag.dataset.tag;
+        const isActive = tag.classList.contains("active");
+
+        if (isActive) {
+          // Unselect - show all
+          tags.forEach(t => t.classList.remove("active"));
+          filterMoviesByGenre("all");
+        } else {
+          // Select new tag
+          tags.forEach(t => t.classList.remove("active"));
+          tag.classList.add("active");
+          filterMoviesByGenre(selected);
+        }
+      });
+    });
+
+    // Handle clicks on genres inside movie info
+    genresInMovies.forEach(genreSpan => {
+      genreSpan.style.cursor = "pointer"; // indicate clickable
+      genreSpan.addEventListener("click", () => {
+        const selectedGenre = genreSpan.textContent.trim();
+
+        // Activate the corresponding tag at the top or create one if missing
+        let correspondingTag = Array.from(tags).find(t => t.dataset.tag === selectedGenre);
+
+        if (!correspondingTag) {
+          // If no tag found, do nothing or you can create a new tag dynamically here
+          filterMoviesByGenre(selectedGenre);
+          return;
+        }
+
+        const isActive = correspondingTag.classList.contains("active");
+
+        if (isActive) {
+          // Unselect all tags if clicking the same genre again
+          tags.forEach(t => t.classList.remove("active"));
+          filterMoviesByGenre("all");
+        } else {
+          tags.forEach(t => t.classList.remove("active"));
+          correspondingTag.classList.add("active");
+          filterMoviesByGenre(selectedGenre);
+        }
+
+        // Scroll to top filter bar for clarity (optional)
+        document.getElementById("tag-filter-wrapper").scrollIntoView({ behavior: "smooth" });
+      });
+    });
+  });
   </script>
 </body>
 </html>
