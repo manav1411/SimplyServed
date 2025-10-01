@@ -127,6 +127,8 @@ Media files are organized in /media_library, each movie in its own folder named 
 - Improve subtitles accuracy by enabling user-selectable options and timing offsets.
 - Add a user management UI to streamline access without Cloudflare email whitelist edits.
 - Enable searching/filtering within the media library for scalability.
+- Change requested movies from being session based to something more bulletproof (JSON?)
+- Sort movies by amount watched + alphabetically within
 
 
 ## Key Files & Components
