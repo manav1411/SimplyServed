@@ -1,6 +1,6 @@
 # SimplyServed - a Media Streaming Server
 **Privacy-first, multi-user, self-hosted streaming platform with automated torrent downloads, and real-time progress tracking.**  
-live demo: [home.manavdodia.com](https://home.manavdodia.com). Please contact me on [Linkedin](https://www.linkedin.com/in/manav-dodia/) if you would like access for a demo.
+Live demo: [home.manavdodia.com](https://home.manavdodia.com). Please contact me on [Linkedin](https://www.linkedin.com/in/manav-dodia/) if you would like access for a demo.
 
 
 ## Desktop Demo
