@@ -4,11 +4,6 @@ from ..utils import load_progress, save_progress
 bp = Blueprint("progress", __name__)
 progress_data = {}
 
-@bp.before_app_first_request
-def load_user_progress():
-    global progress_data
-    progress_data = load_progress(current_app.config['PROGRESS_PATH'])
-
 @bp.route("/progress", methods=["GET", "POST"])
 def movie_progress():
     user = request.headers.get("Cf-Access-Authenticated-User-Email")

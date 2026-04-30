@@ -11,7 +11,7 @@ import json
 import os
 import re
 
-load_dotenv(dotenv_path="/home/manavpi/home_server/.env")
+load_dotenv(dotenv_path="/home/manav/base/SimplyServed/.env")
 JACKETT_API_KEY = os.getenv("JACKETT_API_KEY")
 TMDB_API_KEY = os.getenv("TMDB_API_KEY")
 
@@ -21,15 +21,6 @@ MAX_SEARCH_RESULTS = 5
 in_progress_downloads = {}
 post_processed = set()
 completed_downloads = set()
-
-
-# initially loads the user's progress from the json data
-@bp.before_app_first_request
-def load_user_progress():
-    global progress
-    progress = load_progress(current_app.config['PROGRESS_PATH'])
-
-
 
 # home page, as well as POST request to search for tmdb movies
 @bp.route("/", methods=["GET", "POST"])

@@ -8,7 +8,7 @@ import os
 import re
 
 OPENSUBTITLES_API_KEY = os.getenv("OPENSUBTITLES_API_KEY")
-load_dotenv(dotenv_path="/home/manavpi/home_server/.env")
+load_dotenv(dotenv_path="/home/manav/base/SimplyServed/.env")
 TMDB_API_KEY = os.getenv("TMDB_API_KEY")
 
 # normalises string to remove any special characters

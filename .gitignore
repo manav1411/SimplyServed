@@ -3,4 +3,5 @@ app/__pycache__/
 cloudflared.deb
 media_library/*
 !media_library/.keep
+app/user_progress.json
 .env
