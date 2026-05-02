@@ -5,3 +5,5 @@ media_library/*
 !media_library/.keep
 app/user_progress.json
 .env
+app/*.db
+app/*.db-*

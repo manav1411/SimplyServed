@@ -4,38 +4,30 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{{ movie_name }}</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='movie.css') }}?v=44">
+  <link rel="stylesheet" href="{{ url_for('static', filename='movie.css') }}?v=45">
 </head>
-<body>
-
-<button id="backBtn" onclick="window.location.href='/'" aria-label="Go back to homepage">
-  <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" fill="#000000" width="60" height="60">
-    <g id="SVGRepo_bgCarrier" stroke-width="0"></g>
-    <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g>
-    <g id="SVGRepo_iconCarrier">
-      <path fill="#ffffff" d="M224 480h640a32 32 0 1 1 0 64H224a32 32 0 0 1 0-64z"></path>
-      <path fill="#ffffff" d="m237.248 512 265.408 265.344a32 32 0 0 1-45.312 45.312l-288-288a32 32 0 0 1 0-45.312l288-288a32 32 0 1 1 45.312 45.312L237.248 512z"></path>
-    </g>
-  </svg>
-</button>
-
+<body data-movie-name="{{ movie_name|e }}">
+  <button id="backBtn" aria-label="Go back to homepage">
+    <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" fill="#000000" width="60" height="60">
+      <g id="SVGRepo_bgCarrier" stroke-width="0"></g>
+      <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g>
+      <g id="SVGRepo_iconCarrier">
+        <path fill="#ffffff" d="M224 480h640a32 32 0 1 1 0 64H224a32 32 0 0 1 0-64z"></path>
+        <path fill="#ffffff" d="m237.248 512 265.408 265.344a32 32 0 0 1-45.312 45.312l-288-288a32 32 0 0 1 0-45.312l288-288a32 32 0 1 1 45.312 45.312L237.248 512z"></path>
+      </g>
+    </svg>
+  </button>
 
   <div id="video-container" tabindex="0" aria-label="Video player container">
     <video id="player" autoplay muted preload="metadata" tabindex="-1" aria-describedby="video-desc">
-      <source src="{{ movie_file }}" type="video/mp4" />
+      <source src="{{ movie_file }}" type="{{ mime_type }}" />
+      {% if subtitles_file %}
       <track id="subTrack" label="English" kind="subtitles" srclang="en" src="{{ subtitles_file }}" default>
+      {% endif %}
       Your browser does not support the video tag.
     </video>
 
-    <!-- Loading spinner overlay -->
-    <div id="loadingSpinner" style="
-      position: absolute;
-      top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      display: none;
-      pointer-events: none;
-      z-index: 10;
-    ">
+    <div id="loadingSpinner">
       <p id="loadingText">Please wait a few seconds...</p>
       <svg xmlns="http://www.w3.org/2000/svg" style="margin:auto; background:none; display:block;" width="64px" height="64px" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid">
         <circle class="spinner-ring" cx="50" cy="50" r="32" stroke-width="8" stroke-dasharray="50.26548245743669 50.26548245743669" fill="none" stroke-linecap="round">
@@ -44,16 +36,12 @@
       </svg>
     </div>
 
-
     <p id="video-desc" class="visually-hidden">Video player for {{ movie_name }}</p>
   </div>
 
   <div id="controls" role="group" aria-label="Video player controls">
-
-    <!-- Left control group -->
     <div class="control-group left">
       <button class="control-btn" id="playPauseBtn" aria-label="Play video">
-        <!-- Play icon by default, will toggle -->
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" id="playIcon">
           <path d="M8 5v14l11-7z" />
         </svg>
@@ -63,21 +51,19 @@
         </svg>
       </button>
       <button class="control-btn" id="rewindBtn" aria-label="Rewind 10 seconds">
-        <svg fill="#000000" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52" enable-background="new 0 0 52 52" xml:space="preserve"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"> <g> <path d="M26,7.9V2.6c0-0.5-0.6-0.8-1.1-0.5l-10.3,8.5c-0.4,0.3-0.4,0.9,0,1.2l10.3,8.4c0.4,0.4,1.1,0,1.1-0.4v-5.4 c8,0,14.6,6.5,14.6,14.6S34,43.5,26,43.5c-8,0-14.6-6.5-14.6-14.6c0-2.3,0.5-4.5,1.5-6.5c0,0,0-0.1,0.1-0.2 c0.2-0.4,0.4-0.9,0.6-1.2c0.3-0.5,0.6-1.3,0-1.8c-0.6-0.5-3.1-2.6-3.3-2.7c-0.2-0.1-0.9-0.8-1.6,0.2c-0.4,0.6-0.9,1.5-1.3,2.2 c0,0.1-0.1,0.1-0.1,0.2c-0.2,0.3-0.3,0.6-0.4,0.7l0,0c-1.3,2.7-2,5.8-2,9.1c0,11.6,9.4,21,21,21s21-9.4,21-21S37.6,7.9,26,7.9z"></path> </g> </g></svg>      
+        <svg fill="#000000" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52" enable-background="new 0 0 52 52" xml:space="preserve"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"> <g> <path d="M26,7.9V2.6c0-0.5-0.6-0.8-1.1-0.5l-10.3,8.5c-0.4,0.3-0.4,0.9,0,1.2l10.3,8.4c0.4,0.4,1.1,0,1.1-0.4v-5.4 c8,0,14.6,6.5,14.6,14.6S34,43.5,26,43.5c-8,0-14.6-6.5-14.6-14.6c0-2.3,0.5-4.5,1.5-6.5c0,0,0-0.1,0.1-0.2 c0.2-0.4,0.4-0.9,0.6-1.2c0.3-0.5,0.6-1.3,0-1.8c-0.6-0.5-3.1-2.6-3.3-2.7c-0.2-0.1-0.9-0.8-1.6,0.2c-0.4,0.6-0.9,1.5-1.3,2.2 c0,0.1-0.1,0.1-0.1,0.2c-0.2,0.3-0.3,0.6-0.4,0.7l0,0c-1.3,2.7-2,5.8-2,9.1c0,11.6,9.4,21,21,21s21-9.4,21-21S37.6,7.9,26,7.9z"></path> </g> </g></svg>
       </button>
       <button class="control-btn" id="forwardBtn" aria-label="Forward 10 seconds">
         <svg fill="#000000" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52" enable-background="new 0 0 52 52" xml:space="preserve"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"> <g> <path d="M26,7.9V2.6c0-0.5,0.6-0.8,1.1-0.5l10.3,8.5c0.4,0.3,0.4,0.9,0,1.2l-10.3,8.4c-0.4,0.4-1.1,0-1.1-0.4v-5.4 c-8,0-14.6,6.5-14.6,14.6S18,43.5,26,43.5c8,0,14.6-6.5,14.6-14.6c0-2.3-0.5-4.5-1.5-6.5c0,0,0-0.1-0.1-0.2 c-0.2-0.4-0.4-0.9-0.6-1.2c-0.3-0.5-0.6-1.3,0-1.8c0.6-0.5,3.1-2.6,3.3-2.7c0.2-0.1,0.9-0.8,1.6,0.2c0.4,0.6,0.9,1.5,1.3,2.2 c0,0.1,0.1,0.1,0.1,0.2c0.2,0.3,0.3,0.6,0.4,0.7l0,0c1.3,2.7,2,5.8,2,9.1c0,11.6-9.4,21-21,21S5,40.6,5,29S14.4,7.9,26,7.9z"></path> </g> </g></svg>
       </button>
     </div>
 
-    <!-- Center progress bar -->
-    <div class="control-group center" style="flex-grow:1; margin: 0 16px;">
+    <div class="control-group center">
       <div id="progress-container" aria-label="Video progress bar" role="slider" tabindex="0" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="0% played">
         <div id="progress"></div>
       </div>
     </div>
 
-    <!-- Right control group -->
     <div class="control-group right">
       <button class="control-btn" id="subBtn" aria-label="Toggle subtitles" aria-pressed="true" title="Toggle Subtitles">
         <svg fill="#000000" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" ><title>subtitles</title><path d="M96 416Q82 416 73 407 64 398 64 384L64 128Q64 114 73 105 82 96 96 96L416 96Q430 96 439 105 448 114 448 128L448 384Q448 398 439 407 430 416 416 416L96 416ZM176 296L176 256 112 256 112 296 176 296ZM400 296L400 256 208 256 208 296 400 296ZM304 368L304 328 112 328 112 368 304 368ZM400 368L400 328 336 328 336 368 400 368Z" /></svg>
@@ -88,263 +74,8 @@
         </svg>
       </button>
     </div>
-
   </div>
 
-  <script>
-    const video = document.getElementById("player");
-    const playPauseBtn = document.getElementById("playPauseBtn");
-    const playIcon = document.getElementById("playIcon");
-    const pauseIcon = document.getElementById("pauseIcon");
-    const rewindBtn = document.getElementById("rewindBtn");
-    const forwardBtn = document.getElementById("forwardBtn");
-    const subBtn = document.getElementById("subBtn");
-    const fullscreenBtn = document.getElementById("fullscreenBtn");
-    const progressContainer = document.getElementById("progress-container");
-    const progressBar = document.getElementById("progress");
-    const movieName = "{{ movie_name }}";
-    const progressUrl = "/progress";
-    const loadingSpinner = document.getElementById('loadingSpinner');
-
-    const subtitleOnIcon = `
-    <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" fill="#ffffff">
-      <title>subtitles-solid</title>
-      <g><rect width="48" height="48" fill="none"></rect></g>
-      <path d="M44,6H4A2,2,0,0,0,2,8V40a2,2,0,0,0,2,2H44a2,2,0,0,0,2-2V8A2,2,0,0,0,44,6ZM12,26h4a2,2,0,0,1,0,4H12a2,2,0,0,1,0-4ZM26,36H12a2,2,0,0,1,0-4H26a2,2,0,0,1,0,4Zm10,0H32a2,2,0,0,1,0-4h4a2,2,0,0,1,0,4Zm0-6H22a2,2,0,0,1,0-4H36a2,2,0,0,1,0,4Z"></path>
-    </svg>`;
-
-    const subtitleOffIcon = `
-    <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" fill="#ffffff">
-      <title>subtitles</title>
-      <g><rect width="48" height="48" fill="none"></rect></g>
-      <path d="M44,6H4A2,2,0,0,0,2,8V40a2,2,0,0,0,2,2H44a2,2,0,0,0,2-2V8A2,2,0,0,0,44,6ZM42,38H6V10H42Z"></path>
-      <path d="M12,36H26a2,2,0,0,0,0-4H12a2,2,0,0,0,0,4Z"></path>
-      <path d="M36,32H32a2,2,0,0,0,0,4h4a2,2,0,0,0,0-4Z"></path>
-      <path d="M22,30H36a2,2,0,0,0,0-4H22a2,2,0,0,0,0,4Z"></path>
-      <path d="M12,30h4a2,2,0,0,0,0-4H12a2,2,0,0,0,0,4Z"></path>
-    </svg>`;
-
-
-
-    let autoplayHandled = false;
-    let hideTimeout;
-
-
-    // Show spinner when video is loading/buffering
-    video.addEventListener('waiting', () => {
-      loadingSpinner.style.display = 'block';
-    });
-
-    // Hide spinner when video can play
-    video.addEventListener('canplay', () => {
-      loadingSpinner.style.display = 'none';
-    });
-
-    // Also hide spinner when video starts playing (in case canplay fired before play)
-    video.addEventListener('playing', () => {
-      loadingSpinner.style.display = 'none';
-    });
-
-    const hideUI = () => {
-      document.getElementById('backBtn').classList.add('hide-ui');
-      document.getElementById('controls').classList.add('hide-ui');
-    };
-
-    const showUI = () => {
-      document.getElementById('backBtn').classList.remove('hide-ui');
-      document.getElementById('controls').classList.remove('hide-ui');
-    };
-
-    // Reset timer on mouse movement
-    const resetTimer = () => {
-      showUI();
-      clearTimeout(hideTimeout);
-      hideTimeout = setTimeout(hideUI, 2000);
-    };
-
-    document.addEventListener('mousemove', resetTimer);
-
-    // Start the timer initially
-    resetTimer();
-
-
-    // Toggle play/pause icons
-    function updatePlayPauseButton() {
-      if (video.paused) {
-        playIcon.style.display = "block";
-        pauseIcon.style.display = "none";
-        playPauseBtn.setAttribute("aria-label", "Play video");
-      } else {
-        playIcon.style.display = "none";
-        pauseIcon.style.display = "block";
-        playPauseBtn.setAttribute("aria-label", "Pause video");
-      }
-    }
-
-    playPauseBtn.addEventListener("click", () => {
-      if (video.paused) video.play();
-      else video.pause();
-    });
-
-    rewindBtn.addEventListener("click", () => {
-      rewindBtn.disabled = true;
-      forwardBtn.disabled = true;  // disable both to avoid conflicts
-      video.currentTime = Math.max(0, video.currentTime - 10);
-      setTimeout(() => {
-        rewindBtn.disabled = false;
-        forwardBtn.disabled = false;
-      }, 300); // disable buttons for 300ms to prevent double clicks
-    });
-
-    forwardBtn.addEventListener("click", () => {
-      rewindBtn.disabled = true;
-      forwardBtn.disabled = true;
-      video.currentTime = Math.min(video.duration, video.currentTime + 10);
-      setTimeout(() => {
-        rewindBtn.disabled = false;
-        forwardBtn.disabled = false;
-      }, 300);
-    });
-
-    subBtn.addEventListener("click", () => {
-      const trackElement = document.getElementById("subTrack");
-      const textTrack = trackElement.track;
-
-      if (textTrack.mode === "showing") {
-        textTrack.mode = "disabled";
-        subBtn.setAttribute("aria-pressed", "false");
-        subBtn.title = "Subtitles Off";
-        subBtn.innerHTML = subtitleOffIcon;
-      } else {
-        textTrack.mode = "showing";
-        subBtn.setAttribute("aria-pressed", "true");
-        subBtn.title = "Subtitles On";
-        subBtn.innerHTML = subtitleOnIcon;
-      }
-    });
-
-    fullscreenBtn.addEventListener("click", () => {
-      if (!document.fullscreenElement) {
-        video.requestFullscreen();
-      } else {
-        document.exitFullscreen();
-      }
-    });
-
-    video.addEventListener("timeupdate", () => {
-      const percent = (video.currentTime / video.duration) * 100 || 0;
-      progressBar.style.width = percent + "%";
-      progressContainer.setAttribute("aria-valuenow", percent.toFixed(0));
-      progressContainer.setAttribute("aria-valuetext", `${percent.toFixed(0)}% played`);
-      updatePlayPauseButton();
-    });
-
-    progressContainer.addEventListener("click", (e) => {
-      const rect = progressContainer.getBoundingClientRect();
-      const clickX = e.clientX - rect.left;
-      const width = rect.width;
-      const clickPercent = clickX / width;
-      video.currentTime = clickPercent * video.duration;
-    });
-
-    progressContainer.addEventListener("keydown", (e) => {
-      if (e.key === "ArrowLeft") {
-        video.currentTime = Math.max(0, video.currentTime - 5);
-        e.preventDefault();
-      } else if (e.key === "ArrowRight") {
-        video.currentTime = Math.min(video.duration, video.currentTime + 5);
-        e.preventDefault();
-      }
-    });
-
-    // Autoplay unmute on first interaction
-    document.getElementById("video-container").addEventListener("click", () => {
-      if (!autoplayHandled) {
-        video.muted = false;
-        video.play();
-        autoplayHandled = true;
-      } else {
-        if (video.paused) video.play();
-        else video.pause();
-      }
-    });
-
-    // Restore progress
-    fetch(`${progressUrl}?movie=${encodeURIComponent(movieName)}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.time) video.currentTime = data.time;
-      });
-
-    // Save progress every 5s
-    setInterval(() => {
-      fetch(progressUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ movie: movieName, time: video.currentTime })
-      });
-    }, 5000);
-
-    // Save on unload
-    window.addEventListener("beforeunload", () => {
-      navigator.sendBeacon(progressUrl, JSON.stringify({ movie: movieName, time: video.currentTime }));
-    });
-
-    // Initialize
-    document.addEventListener("DOMContentLoaded", () => {
-      updatePlayPauseButton();
-
-      const track = document.getElementById("subTrack");
-
-      if (track.track.mode === "showing") {
-        subBtn.setAttribute("aria-pressed", "true");
-        subBtn.title = "Subtitles On";
-        subBtn.innerHTML = subtitleOnIcon;
-      } else {
-        subBtn.setAttribute("aria-pressed", "false");
-        subBtn.title = "Subtitles Off";
-        subBtn.innerHTML = subtitleOffIcon;
-      }
-    });
-    
-
-    // Keyboard shortcuts (space, arrows, f, s)
-    document.addEventListener("keydown", (e) => {
-      if (["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) return;
-
-      switch(e.key.toLowerCase()) {
-        case " ":
-          e.preventDefault();
-          playPauseBtn.click();
-          break;
-        case "arrowleft":
-          rewindBtn.click();
-          break;
-        case "arrowright":
-          forwardBtn.click();
-          break;
-        case "f":
-          fullscreenBtn.click();
-          break;
-        case "c":
-          subBtn.click();
-          break;
-      }
-    });
-  </script>
-
-  <style>
-    /* Visually hidden helper for accessibility */
-    .visually-hidden {
-      position: absolute !important;
-      width: 1px; 
-      height: 1px; 
-      padding: 0; 
-      margin: -1px; 
-      overflow: hidden; 
-      clip: rect(0, 0, 0, 0); 
-      border: 0;
-    }
-  </style>
+  <script src="{{ url_for('static', filename='movie.js') }}?v=1" defer></script>
 </body>
 </html>

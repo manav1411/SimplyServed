@@ -2,7 +2,7 @@ import requests
 from flask import request, abort, session
 
 def identify_user():
-    if request.path.startswith("/media") or request.path.startswith("/static"):
+    if request.path.startswith("/media_library") or request.path.startswith("/static"):
         return
     
     user_email = request.headers.get("Cf-Access-Authenticated-User-Email")
@@ -16,6 +16,9 @@ def identify_user():
         session["user_name"] = get_user_name(request)
     
     request.user_name = session["user_name"]
+
+    from .state import record_user
+    record_user(user_email, request.user_name)
 
 def get_user_name(request):
     try:

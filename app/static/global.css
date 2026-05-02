@@ -280,6 +280,27 @@ h1 {
     justify-content: center;
 }
 
+.missing-poster {
+    width: 100%;
+    aspect-ratio: 2 / 3;
+    background: #444;
+    color: #ccc;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.search-status {
+    display: none;
+    text-align: center;
+    margin-top: 10px;
+    font-weight: bold;
+}
+
+.controls-help {
+    margin-top: 1em;
+}
+
 .tmdb-result img {
     width: 100%;
     border-radius: 8px;

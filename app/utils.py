@@ -7,8 +7,8 @@ import json
 import os
 import re
 
-OPENSUBTITLES_API_KEY = os.getenv("OPENSUBTITLES_API_KEY")
 load_dotenv(dotenv_path="/home/manav/base/SimplyServed/.env")
+OPENSUBTITLES_API_KEY = os.getenv("OPENSUBTITLES_API_KEY")
 TMDB_API_KEY = os.getenv("TMDB_API_KEY")
 
 # normalises string to remove any special characters
@@ -59,7 +59,7 @@ def search_and_download_subtitle(movie_name, save_path, language="en"):
     }
 
     # sends request to search for subs
-    response = requests.get(search_url, headers=headers, params=params)
+    response = requests.get(search_url, headers=headers, params=params, timeout=15)
     try:
         data = response.json()
     except Exception:
@@ -77,7 +77,7 @@ def search_and_download_subtitle(movie_name, save_path, language="en"):
 
     # sends request to download subs
     download_url = "https://api.opensubtitles.com/api/v1/download"
-    r = requests.post(download_url, headers=headers, json={"file_id": file_id})
+    r = requests.post(download_url, headers=headers, json={"file_id": file_id}, timeout=15)
     try:
         dl_link = r.json().get("link")
     except Exception:
@@ -91,7 +91,7 @@ def search_and_download_subtitle(movie_name, save_path, language="en"):
         return False
 
     # Downloads subtitle file
-    sub_response = requests.get(dl_link)
+    sub_response = requests.get(dl_link, timeout=30)
     os.makedirs(save_path, exist_ok=True)
     srt_path = os.path.join(save_path, "subtitles.srt")
     with open(srt_path, "wb") as f:
@@ -148,7 +148,7 @@ def download_poster_and_metadata(tmdb_id, save_path):
     # sends request to tmdb of given movie id
     headers = {"Authorization": f"Bearer {TMDB_API_KEY}"}
     url = f"https://api.themoviedb.org/3/movie/{tmdb_id}"
-    r = requests.get(url, headers=headers)
+    r = requests.get(url, headers=headers, timeout=10)
     
     if r.status_code != 200:
         current_app.logger.error(f"Failed to fetch TMDb data: {r.text}")
@@ -183,7 +183,7 @@ def download_poster_and_metadata(tmdb_id, save_path):
         return False
 
     full_poster_url = f"https://image.tmdb.org/t/p/original{poster_path}"
-    poster_response = requests.get(full_poster_url, stream=True)
+    poster_response = requests.get(full_poster_url, stream=True, timeout=30)
     
     if poster_response.status_code == 200:
         poster_file = os.path.join(save_path, "poster.jpg")
