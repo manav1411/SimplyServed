@@ -19,7 +19,7 @@
   </button>
 
   <div id="video-container" tabindex="0" aria-label="Video player container">
-    <video id="player" autoplay muted preload="metadata" tabindex="-1" aria-describedby="video-desc">
+    <video id="player" preload="auto" tabindex="-1" aria-describedby="video-desc">
       <source src="{{ movie_file }}" type="{{ mime_type }}" />
       {% if subtitles_file %}
       <track id="subTrack" label="English" kind="subtitles" srclang="en" src="{{ subtitles_file }}" default>

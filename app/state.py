@@ -56,6 +56,7 @@ def init_db():
             title TEXT NOT NULL,
             folder_name TEXT NOT NULL,
             status TEXT NOT NULL,
+            requested_by_email TEXT,
             torrent_hash TEXT,
             torrent_name TEXT,
             progress REAL NOT NULL DEFAULT 0,
@@ -74,7 +75,14 @@ def init_db():
         );
         """
     )
+    ensure_column("downloads", "requested_by_email", "TEXT")
     db.commit()
+
+
+def ensure_column(table, column, definition):
+    columns = {row["name"] for row in get_db().execute(f"PRAGMA table_info({table})").fetchall()}
+    if column not in columns:
+        get_db().execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
 
 
 def record_user(email, display_name=None):
@@ -139,7 +147,7 @@ def migrate_progress_json(path):
 
 def find_media_filename(folder_path):
     for filename in sorted(os.listdir(folder_path)):
-        if filename.lower().startswith("movie.") and filename.lower().endswith((".mp4", ".mkv", ".avi", ".mov")):
+        if filename.lower().startswith("movie.") and filename.lower().endswith(".mp4"):
             return filename
     return None
 
@@ -226,7 +234,7 @@ def get_movie_by_folder(folder_name):
 
 def list_movies_for_user(user_email):
     sync_media_library()
-    rows = get_db().execute("SELECT * FROM movies ORDER BY title COLLATE NOCASE").fetchall()
+    rows = get_db().execute("SELECT * FROM movies WHERE media_filename IS NOT NULL ORDER BY title COLLATE NOCASE").fetchall()
     movies = []
     for row in rows:
         folder_name = row["folder_name"]
@@ -255,19 +263,31 @@ def list_movies_for_user(user_email):
     return movies
 
 
-def upsert_download(tmdb_id, title, folder_name, status, torrent_hash=None, torrent_name=None, progress=0, state=None, error_message=None):
+def upsert_download(
+    tmdb_id,
+    title,
+    folder_name,
+    status,
+    requested_by_email=None,
+    torrent_hash=None,
+    torrent_name=None,
+    progress=0,
+    state=None,
+    error_message=None,
+):
     now = utc_now()
     get_db().execute(
         """
         INSERT INTO downloads (
-            tmdb_id, title, folder_name, status, torrent_hash, torrent_name,
+            tmdb_id, title, folder_name, status, requested_by_email, torrent_hash, torrent_name,
             progress, state, error_message, created_at, updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(tmdb_id) DO UPDATE SET
             title = excluded.title,
             folder_name = excluded.folder_name,
             status = excluded.status,
+            requested_by_email = COALESCE(excluded.requested_by_email, downloads.requested_by_email),
             torrent_hash = COALESCE(excluded.torrent_hash, downloads.torrent_hash),
             torrent_name = COALESCE(excluded.torrent_name, downloads.torrent_name),
             progress = excluded.progress,
@@ -275,7 +295,20 @@ def upsert_download(tmdb_id, title, folder_name, status, torrent_hash=None, torr
             error_message = excluded.error_message,
             updated_at = excluded.updated_at
         """,
-        (tmdb_id, title, folder_name, status, torrent_hash, torrent_name, progress, state, error_message, now, now),
+        (
+            tmdb_id,
+            title,
+            folder_name,
+            status,
+            requested_by_email,
+            torrent_hash,
+            torrent_name,
+            progress,
+            state,
+            error_message,
+            now,
+            now,
+        ),
     )
     get_db().commit()
 
@@ -292,6 +325,12 @@ def get_download_by_title(title):
         if normalized == row_norm:
             return row
     return None
+
+
+def list_active_downloads():
+    return get_db().execute(
+        "SELECT * FROM downloads WHERE status IN ('requested', 'downloading', 'processing')"
+    ).fetchall()
 
 
 def delete_download(tmdb_id):

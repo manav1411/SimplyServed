@@ -10,11 +10,18 @@ def create_app():
     load_dotenv(dotenv_path=os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '.env')))
 
     app = Flask(__name__)
-    default_secret = os.urandom(32)
-    app.secret_key = os.getenv("FLASK_SECRET_KEY") or default_secret
+    secret_key = os.getenv("FLASK_SECRET_KEY")
+    if not secret_key and os.getenv("ALLOW_RANDOM_FLASK_SECRET") != "1":
+        raise RuntimeError("FLASK_SECRET_KEY must be set. Use ALLOW_RANDOM_FLASK_SECRET=1 only for local throwaway dev.")
+    app.secret_key = secret_key or os.urandom(32)
     app.config['MEDIA_PATH'] = media_path
     app.config['PROGRESS_PATH'] = progress_path
     app.config['DATABASE_PATH'] = os.getenv("DATABASE_PATH") or database_path
+    app.config['ADMIN_EMAILS'] = {
+        email.strip().lower()
+        for email in (os.getenv("ADMIN_EMAILS") or "").split(",")
+        if email.strip()
+    }
 
     from .state import close_db, init_db, migrate_progress_json, sync_media_library
     app.teardown_appcontext(close_db)

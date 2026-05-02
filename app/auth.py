@@ -16,9 +16,20 @@ def identify_user():
         session["user_name"] = get_user_name(request)
     
     request.user_name = session["user_name"]
+    request.is_admin = user_email.lower() in current_admin_emails()
 
     from .state import record_user
     record_user(user_email, request.user_name)
+
+
+def current_admin_emails():
+    from flask import current_app
+    return current_app.config.get("ADMIN_EMAILS", set())
+
+
+def require_admin():
+    if not getattr(request, "is_admin", False):
+        abort(403)
 
 def get_user_name(request):
     try:
@@ -26,7 +37,8 @@ def get_user_name(request):
         cf_cookie = request.cookies.get("CF_Authorization")
         response = requests.get(
             "https://manavdodia.cloudflareaccess.com/cdn-cgi/access/get-identity",
-            headers={"Cookie": f"CF_Authorization={cf_cookie}"}
+            headers={"Cookie": f"CF_Authorization={cf_cookie}"},
+            timeout=5,
         )
         if response.status_code == 200:
             identity = response.json()

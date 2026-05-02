@@ -87,9 +87,16 @@ function initializeRequests() {
   document.querySelectorAll(".tmdb-result").forEach(async (div) => {
     const tmdbId = div.dataset.id;
     const title = div.dataset.title;
+    const initialState = div.dataset.state;
+    const initialError = div.dataset.error;
     const statusDiv = div.querySelector(".download-status");
     const progressBar = statusDiv.querySelector("progress");
     const statusText = statusDiv.querySelector(".status-text");
+
+    if (initialState === "failed") {
+      statusText.textContent = initialError || "Request failed";
+      return;
+    }
 
     const stateResponse = await fetch(`/download_state/${tmdbId}`);
     const stateData = await stateResponse.json();
@@ -114,7 +121,10 @@ function initializeRequests() {
 
       progressBar.value = data.progress;
       statusText.textContent = `${(data.progress * 100).toFixed(1)}% - ${data.state}`;
-      if (data.progress >= 1.0 || data.state === "ready") {
+      if (data.state === "processing") {
+        statusText.textContent = "Processing...";
+      }
+      if (data.progress >= 1.0 && data.state === "ready") {
         clearInterval(poll);
         div.remove();
         window.location.reload();
@@ -213,4 +223,3 @@ function initializeGenreFilters() {
     });
   });
 }
-

@@ -9,6 +9,16 @@
   <div class="main-container">
     <h1 id="greeting"></h1>
 
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+      <div class="flash-messages">
+        {% for category, message in messages %}
+        <div class="flash-message {{ category }}">{{ message }}</div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    {% endwith %}
+
     <div id="tag-filter-wrapper">
       <div id="tag-filter-container">
         <span class="tag-filter" data-tag="all">All</span>
@@ -79,7 +89,11 @@
       {% if searched_movies|length > 0 %}
       <div id="searched-movies" class="tmdb-results-container">
         {% for m in searched_movies %}
-        <div class="tmdb-result" data-id="{{ m.id }}" data-title="{{ m.title|e }}" data-state="{{ m.download_state|default('downloading') }}">
+        <div class="tmdb-result"
+             data-id="{{ m.id }}"
+             data-title="{{ m.title|e }}"
+             data-state="{{ m.download_state|default('downloading') }}"
+             data-error="{{ m.download_error|default('')|e }}">
           <div class="cancel-wrapper">
             <button class="close-btn" title="Cancel request">Cancel Request</button>
           </div>
@@ -104,15 +118,17 @@
       {% endif %}
     </div>
 
-    <div id="controls-toggle">⚙️ Controls</div>
-    <div id="controls-panel" class="hidden">
-      <div id="storage-info">Loading...</div>
-      <ul id="media-directories"></ul>
-      <p class="controls-help">
-        If torrent(s) are failing to cancel, when ONLY those torrents are in the requests section,
-        <button id="reset-search-btn">Click Here</button>
-      </p>
-    </div>
+    {% if is_admin %}
+      <div id="controls-toggle">⚙️ Controls</div>
+      <div id="controls-panel" class="hidden">
+        <div id="storage-info">Loading...</div>
+        <ul id="media-directories"></ul>
+        <p class="controls-help">
+          If torrent(s) are failing to cancel, when ONLY those torrents are in the requests section,
+          <button id="reset-search-btn">Click Here</button>
+        </p>
+      </div>
+    {% endif %}
     <div id="bottom"></div>
   </div>
 

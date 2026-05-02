@@ -20,6 +20,26 @@ body::before {
     opacity: 0.03;
 }
 
+.flash-messages {
+    max-width: 720px;
+    margin: 0 auto 20px;
+    padding: 0 16px;
+}
+
+.flash-message {
+    background: #333;
+    border: 1px solid #555;
+    border-radius: 6px;
+    color: #fff;
+    padding: 10px 12px;
+    text-align: center;
+}
+
+.flash-message.error {
+    border-color: #e74c3c;
+    color: #ffd8d3;
+}
+
 /* Layout wrapper for vertical flex layout */
 .main-container {
     display: flex;

@@ -105,39 +105,46 @@ def search_and_download_subtitle(movie_name, save_path, language="en"):
 
 
 
-# move biggest file from child to parent folder, renames file to 'movie.{ext}', removes child folder
-def finalize_movie_folder(base_path):
-    contents = os.listdir(base_path)
-    dirs = [d for d in contents if os.path.isdir(os.path.join(base_path, d))]
-
-    if len(dirs) != 1:
-        current_app.logger.warning(f"Unexpected folder structure in {base_path}: {dirs}")
+def finalize_movie_folder(base_path, allowed_extensions=(".mp4",)):
+    if not os.path.isdir(base_path):
+        current_app.logger.warning(f"Movie folder does not exist: {base_path}")
         return False
 
-    inner_folder = os.path.join(base_path, dirs[0])
+    existing_movie = [
+        filename for filename in os.listdir(base_path)
+        if filename.lower().startswith("movie.") and filename.lower().endswith(allowed_extensions)
+    ]
+    if existing_movie:
+        return True
+
+    contents = os.listdir(base_path)
+    dirs = [os.path.join(base_path, d) for d in contents if os.path.isdir(os.path.join(base_path, d))]
+    search_roots = dirs if len(dirs) == 1 else [base_path]
     video_files = []
 
-    # finds biggest video file in child folder
-    for root, _, files in os.walk(inner_folder):
-        for file in files:
-            if file.lower().endswith((".mp4", ".mkv", ".avi", ".mov")):
-                full_path = os.path.join(root, file)
-                size = os.path.getsize(full_path)
-                video_files.append((size, full_path, file))
+    for search_root in search_roots:
+        for root, _, files in os.walk(search_root):
+            for file in files:
+                if file.lower().endswith(allowed_extensions):
+                    full_path = os.path.join(root, file)
+                    size = os.path.getsize(full_path)
+                    video_files.append((size, full_path, file))
 
     if not video_files:
-        current_app.logger.warning(f"No video files found in {inner_folder}")
+        current_app.logger.warning(f"No supported video files found in {base_path}. Allowed: {allowed_extensions}")
         return False
 
-    # Pick the largest video file
     _, src_path, original_filename = max(video_files, key=lambda x: x[0])
     ext = os.path.splitext(original_filename)[1]
     dst_path = os.path.join(base_path, f"movie{ext}")
 
-    # move video file from child, then remove child
-    shutil.move(src_path, dst_path)
-    shutil.rmtree(inner_folder)
-    current_app.logger.info(f"Moved {original_filename} to {dst_path} and removed {inner_folder}")
+    if os.path.realpath(src_path) != os.path.realpath(dst_path):
+        shutil.move(src_path, dst_path)
+
+    for directory in dirs:
+        if os.path.exists(directory):
+            shutil.rmtree(directory)
+    current_app.logger.info(f"Finalized {original_filename} to {dst_path}")
     return True
 
 
