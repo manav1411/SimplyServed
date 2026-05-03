@@ -15,6 +15,7 @@ from ..services.tmdb import TMDbClient
 from ..state import (
     delete_download,
     delete_movie_by_folder,
+    get_db,
     get_download,
     get_download_by_title,
     get_movie,
@@ -553,6 +554,50 @@ def delete_folder(folder):
     delete_movie_by_folder(folder)
     _invalidate_controls_cache()
     return "", 204
+
+
+@bp.route("/settings_stats")
+def settings_stats():
+    db = get_db()
+    user_email = request.user_email
+
+    total_seconds = float(
+        db.execute(
+            "SELECT COALESCE(SUM(seconds), 0) as t FROM playback_progress WHERE user_email = ?",
+            (user_email,),
+        ).fetchone()["t"]
+    )
+    movies_started = db.execute(
+        "SELECT COUNT(*) as c FROM playback_progress WHERE user_email = ? AND seconds > 60",
+        (user_email,),
+    ).fetchone()["c"]
+    total_movies = db.execute(
+        "SELECT COUNT(*) as c FROM movies WHERE media_filename IS NOT NULL"
+    ).fetchone()["c"]
+    requests_made = db.execute(
+        "SELECT COUNT(*) as c FROM downloads WHERE requested_by_email = ?",
+        (user_email,),
+    ).fetchone()["c"]
+
+    genre_rows = db.execute(
+        "SELECT genres_json FROM movies WHERE media_filename IS NOT NULL"
+    ).fetchall()
+    genre_counts = {}
+    for row in genre_rows:
+        try:
+            for g in json.loads(row["genres_json"] or "[]"):
+                genre_counts[g] = genre_counts.get(g, 0) + 1
+        except (json.JSONDecodeError, TypeError):
+            pass
+    top_genres = sorted(genre_counts, key=genre_counts.get, reverse=True)[:3]
+
+    return jsonify({
+        "hours_watched": round(total_seconds / 3600, 1),
+        "movies_started": movies_started,
+        "total_movies": total_movies,
+        "requests_made": requests_made,
+        "top_genres": top_genres,
+    })
 
 
 @bp.route("/movie_card/<int:tmdb_id>")

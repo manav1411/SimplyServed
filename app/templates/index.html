@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <link rel="stylesheet" href="{{ url_for('static', filename='global.css') }}?v=136">
+    <link rel="stylesheet" href="{{ url_for('static', filename='global.css') }}?v=141">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SimplyServed</title>
     {% set genre_slugs = [] %}
@@ -137,21 +137,40 @@
       {% endif %}
     </div>
 
-    <!-- {% if is_admin %} NOTE: Add this if you only want admin to see this stuff -->
-      <div id="controls-toggle">⚙️ Controls</div>
-      <div id="controls-panel" class="hidden">
+    <div id="controls-toggle">⚙️ Settings</div>
+    <div id="controls-panel" class="hidden">
+      <div class="settings-tabs">
+        <button class="settings-tab active" data-tab="about">About</button>
+        <button class="settings-tab" data-tab="stats">Stats</button>
+        <button class="settings-tab" data-tab="storage">Storage</button>
+      </div>
+
+      <div class="settings-pane hidden" id="pane-storage">
         <div id="storage-info">Loading...</div>
         <ul id="media-directories"></ul>
-        
-        <!-- <p class="controls-help">    NOTE: legacy button for legacy issue. here for reference.
-          If torrent(s) are failing to cancel, when ONLY those torrents are in the requests section,
-          <button id="reset-search-btn">Click Here</button>
-        </p> -->
       </div>
-    <!-- {% endif %} -->
+
+      <div class="settings-pane hidden" id="pane-stats">
+        <div id="stats-content">Loading...</div>
+      </div>
+
+      <div class="settings-pane" id="pane-about">
+        <div class="about-layout">
+          <div class="about-text">
+            <p>Hey I'm Manav! I like movies and making stuff - hence this project :) if you want to check out more of my work, see my website below.</p>
+            <p>if you have suggestions, you alr know my contact details ;)</p>
+            <a href="https://manavdodia.com" target="_blank" rel="noopener noreferrer" class="about-link">
+              manavdodia.com
+              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            </a>
+          </div>
+          <img src="{{ url_for('static', filename='manavAnime.png') }}" alt="Manav" class="about-img">
+        </div>
+      </div>
+    </div>
     <div id="bottom"></div>
   </div>
 
-  <script src="{{ url_for('static', filename='index.js') }}?v=6" defer></script>
+  <script src="{{ url_for('static', filename='index.js') }}?v=9" defer></script>
 </body>
 </html>

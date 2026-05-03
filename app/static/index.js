@@ -1,3 +1,8 @@
+console.log(
+  "%cSimplyServed — made by Manav\nIf you're reading this, you're one of us.",
+  "font-size:14px;font-weight:bold;color:#52ff80;"
+);
+
 document.addEventListener("DOMContentLoaded", () => {
   initializeProgressBars();
   initializeMovieCards();
@@ -6,6 +11,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initializeControlsPanel();
   initializeSearchForm();
   initializeGenreFilters();
+  initializeEasterEggs();
 });
 
 function initializeProgressBar(container) {
@@ -61,11 +67,18 @@ function initializeGreeting() {
   const hour = new Date().getHours();
   const avatars = ["🎬", "🍿", "🎥", "🌌", "🛸", "🤖", "🧙‍♂️"];
   const randomAvatar = avatars[Math.floor(Math.random() * avatars.length)];
-  let timeOfDay = "Hello";
-  if (hour < 12) timeOfDay = "Good morning";
-  else if (hour < 18) timeOfDay = "Good afternoon";
-  else timeOfDay = "Good evening";
-  greeting.textContent = `${timeOfDay}, ${name} ${randomAvatar}`;
+  const safeName = name.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const emojiSpan = `<span id="greeting-emoji">${randomAvatar}</span>`;
+
+  if (hour >= 0 && hour < 5) {
+    greeting.innerHTML = `bit late for a movie innit, ${safeName}? ${emojiSpan}`;
+  } else {
+    let timeOfDay = "Hello";
+    if (hour < 12) timeOfDay = "Good morning";
+    else if (hour < 18) timeOfDay = "Good afternoon";
+    else timeOfDay = "Good evening";
+    greeting.innerHTML = `${timeOfDay}, ${safeName} ${emojiSpan}`;
+  }
 }
 
 function initializeRequests() {
@@ -219,10 +232,13 @@ function initializeControlsPanel() {
   const panel = document.getElementById("controls-panel");
   if (!toggleBtn || !panel) return;
 
-  let cachedData = null;
+  let cachedStorageData = null;
+  let cachedStatsData = null;
+  let activeTab = "about";
 
-  function renderControlsData(data) {
-    cachedData = data;
+  // --- Storage tab ---
+  function renderStorageData(data) {
+    cachedStorageData = data;
     document.getElementById("storage-info").innerHTML =
       `<div style="text-align: center; font-size: 1.5em; font-weight: bold;">Library size: ${(data.total_size / 1024).toFixed(2)} GB</div>`;
     const ul = document.getElementById("media-directories");
@@ -234,28 +250,70 @@ function initializeControlsPanel() {
     });
   }
 
-  function fetchControlsInfo() {
-    return fetch("/controls_info").then((r) => r.json()).then(renderControlsData);
+  function loadStorage() {
+    if (cachedStorageData) {
+      renderStorageData(cachedStorageData);
+      fetch("/controls_info").then((r) => r.json()).then((d) => { cachedStorageData = d; renderStorageData(d); }).catch(() => {});
+    } else {
+      fetch("/controls_info").then((r) => r.json()).then(renderStorageData).catch(() => {
+        document.getElementById("storage-info").textContent = "Failed to load storage info";
+      });
+    }
   }
 
-  // Pre-fetch so data is ready before the user opens the panel
+  // --- Stats tab ---
+  function renderStatsData(data) {
+    cachedStatsData = data;
+    const topGenres = data.top_genres.length ? data.top_genres.join(", ") : "N/A";
+    document.getElementById("stats-content").innerHTML = `
+      <div class="stat-item"><span>Library</span><span class="stat-value">${data.total_movies} movies</span></div>
+      <div class="stat-item"><span>Hours watched</span><span class="stat-value">${data.hours_watched} hrs</span></div>
+      <div class="stat-item"><span>Movies started</span><span class="stat-value">${data.movies_started}</span></div>
+      <div class="stat-item"><span>Your requests</span><span class="stat-value">${data.requests_made}</span></div>
+      <div class="stat-item"><span>Top genres</span><span class="stat-value">${topGenres}</span></div>
+    `;
+  }
+
+  function loadStats() {
+    if (cachedStatsData) { renderStatsData(cachedStatsData); return; }
+    document.getElementById("stats-content").textContent = "Loading...";
+    fetch("/settings_stats").then((r) => r.json()).then(renderStatsData).catch(() => {
+      document.getElementById("stats-content").textContent = "Failed to load stats";
+    });
+  }
+
+  // --- Tab switching ---
+  function activatePaneUI(tab) {
+    panel.querySelectorAll(".settings-tab").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.tab === tab);
+    });
+    panel.querySelectorAll(".settings-pane").forEach((pane) => {
+      pane.classList.toggle("hidden", pane.id !== `pane-${tab}`);
+    });
+  }
+
+  function showTab(tab) {
+    activeTab = tab;
+    activatePaneUI(tab);
+    if (tab === "storage") loadStorage();
+    else if (tab === "stats") loadStats();
+  }
+
+  panel.querySelectorAll(".settings-tab").forEach((btn) => {
+    btn.addEventListener("click", () => showTab(btn.dataset.tab));
+  });
+
+  // Set initial pane state immediately so it's correct before the panel is even opened
+  activatePaneUI("about");
+
+  // Pre-fetch storage so data is ready before the user opens the panel
   setTimeout(() => {
-    fetch("/controls_info").then((r) => r.json()).then((data) => { cachedData = data; }).catch(() => {});
+    fetch("/controls_info").then((r) => r.json()).then((d) => { cachedStorageData = d; }).catch(() => {});
   }, 1500);
 
   toggleBtn.addEventListener("click", () => {
     panel.classList.toggle("hidden");
-    if (panel.classList.contains("hidden")) return;
-
-    if (cachedData) {
-      renderControlsData(cachedData);
-      // Silently refresh in background in case library changed
-      fetchControlsInfo().catch(() => {});
-    } else {
-      fetchControlsInfo().catch(() => {
-        document.getElementById("storage-info").textContent = "Failed to load storage info";
-      });
-    }
+    if (!panel.classList.contains("hidden")) showTab(activeTab);
   });
 
   // Close when clicking outside the panel or toggle button
@@ -303,7 +361,13 @@ function initializeSearchForm() {
   const statusDiv = document.querySelector(".search-status");
   if (!form || !statusDiv) return;
 
-  form.addEventListener("submit", () => {
+  form.addEventListener("submit", (e) => {
+    const query = (form.querySelector('input[name="query"]')?.value || "").trim().toLowerCase();
+    if (query === "popcorn") {
+      e.preventDefault();
+      triggerPopcornRain();
+      return;
+    }
     statusDiv.style.display = "block";
     const button = form.querySelector("button[type='submit']");
     if (button) button.disabled = true;
@@ -355,4 +419,88 @@ function initializeGenreFilters() {
   });
 
   attachGenreSpanListeners(document.querySelectorAll(".movie-info .genre"));
+}
+
+// ---- Easter eggs ----
+
+function initializeEasterEggs() {
+  initializeEmojiEasterEgg();
+  initializeAvatarEasterEgg();
+}
+
+function initializeEmojiEasterEgg() {
+  const emojiEl = document.getElementById("greeting-emoji");
+  if (!emojiEl) return;
+  let clickCount = 0;
+  let resetTimeout = null;
+  emojiEl.addEventListener("click", () => {
+    clickCount++;
+    clearTimeout(resetTimeout);
+    resetTimeout = setTimeout(() => { clickCount = 0; }, 3000);
+    if (clickCount >= 5) {
+      clickCount = 0;
+      clearTimeout(resetTimeout);
+      triggerCredits();
+    }
+  });
+}
+
+function triggerCredits() {
+  if (document.getElementById("credits-overlay")) return;
+  const overlay = document.createElement("div");
+  overlay.id = "credits-overlay";
+  overlay.innerHTML = `
+    <div class="credits-scroll">
+      <p class="credits-title">S I M P L Y S E R V E D</p>
+      <div class="credits-row"><span>Written &amp; Directed by</span><span>Manav Dodia</span></div>
+      <div class="credits-row"><span>Produced by</span><span>Manav Dodia</span></div>
+      <div class="credits-row"><span>Cinematography</span><span>Manav Dodia</span></div>
+      <div class="credits-row"><span>Visual Effects</span><span>Manav Dodia</span></div>
+      <div class="credits-row"><span>Catering</span><span>Manav Dodia</span></div>
+      <p class="credits-footer">Filmed entirely on a Raspberry Pi 400.<br>No movies were harmed.</p>
+    </div>
+  `;
+  overlay.addEventListener("click", () => overlay.remove());
+  document.body.appendChild(overlay);
+  setTimeout(() => overlay.remove(), 9000);
+}
+
+function initializeAvatarEasterEgg() {
+  const img = document.querySelector(".about-img");
+  if (!img) return;
+  const messages = ["Oi!", "Stop that!", "Scallywag..."];
+  let index = 0;
+  let bubble = null;
+  let wobbleTimeout = null;
+  img.style.cursor = "pointer";
+  img.addEventListener("click", () => {
+    img.classList.remove("avatar-wobble");
+    clearTimeout(wobbleTimeout);
+    void img.offsetWidth;
+    img.classList.add("avatar-wobble");
+    wobbleTimeout = setTimeout(() => img.classList.remove("avatar-wobble"), 500);
+
+    if (bubble) bubble.remove();
+    bubble = document.createElement("div");
+    bubble.className = "speech-bubble";
+    bubble.textContent = messages[index % messages.length];
+    index++;
+    const rect = img.getBoundingClientRect();
+    bubble.style.cssText = `position:fixed;top:${rect.top - 44}px;left:${rect.left + rect.width / 2}px;transform:translateX(-50%);z-index:99999;`;
+    document.body.appendChild(bubble);
+    setTimeout(() => { if (bubble) { bubble.remove(); bubble = null; } }, 2000);
+  });
+}
+
+function triggerPopcornRain() {
+  const container = document.createElement("div");
+  container.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:99999;overflow:hidden;";
+  document.body.appendChild(container);
+  for (let i = 0; i < 35; i++) {
+    const p = document.createElement("span");
+    p.textContent = "🍿";
+    p.style.cssText = `position:absolute;font-size:${1 + Math.random() * 1.2}em;left:${Math.random() * 100}%;top:-2em;animation:popcornFall ${1.5 + Math.random() * 2}s linear ${Math.random() * 2}s forwards;`;
+    container.appendChild(p);
+  }
+  setTimeout(() => container.remove(), 6000);
 }
