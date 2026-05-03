@@ -43,65 +43,73 @@ def convert_srt_to_vtt(srt_path):
 
 
 
-# searches for subs using opensubtitles, downloads most popular subs to given save path
-def search_and_download_subtitle(movie_name, save_path, language="en"):
+# searches for subs using opensubtitles, downloads top `count` results
+def search_and_download_subtitle(movie_name, save_path, language="en", count=5):
     search_url = "https://api.opensubtitles.com/api/v1/subtitles"
-    headers = {
-        "Api-Key": OPENSUBTITLES_API_KEY,
-        "User-Agent": "home server"
-    }
-
+    headers = {"Api-Key": OPENSUBTITLES_API_KEY, "User-Agent": "home server"}
     params = {
         "query": movie_name,
         "languages": language,
         "order_by": "download_count",
-        "order_direction": "desc"
+        "order_direction": "desc",
     }
 
-    # sends request to search for subs
     response = requests.get(search_url, headers=headers, params=params, timeout=15)
     try:
         data = response.json()
     except Exception:
-        print("Failed to decode JSON.")
-        print("Status Code:", response.status_code)
-        print("Response text:", response.text)
+        print(f"Failed to decode subtitle search JSON: {response.status_code} {response.text}")
         return False
 
     if "data" not in data or not data["data"]:
-        print(f"No subtitles found for movie: {movie_name}")
+        print(f"No subtitles found for: {movie_name}")
         return False
 
-    best_match = data["data"][0]
-    file_id = best_match["attributes"]["files"][0]["file_id"]
-
-    # sends request to download subs
     download_url = "https://api.opensubtitles.com/api/v1/download"
-    r = requests.post(download_url, headers=headers, json={"file_id": file_id}, timeout=15)
-    try:
-        dl_link = r.json().get("link")
-    except Exception:
-        print("Failed to parse download response JSON.")
-        print("Status Code:", r.status_code)
-        print("Response text:", r.text)
+    saved = []
+
+    for i, result in enumerate(data["data"][:count], start=1):
+        attrs = result.get("attributes", {})
+        files = attrs.get("files", [])
+        if not files:
+            continue
+        file_id = files[0]["file_id"]
+
+        release = (attrs.get("release") or f"Subtitle {i}").strip()
+        if len(release) > 55:
+            release = release[:52] + "..."
+
+        r = requests.post(download_url, headers=headers, json={"file_id": file_id}, timeout=15)
+        try:
+            dl_link = r.json().get("link")
+        except Exception:
+            print(f"Failed to parse download link for subtitle {i}")
+            continue
+
+        if not dl_link:
+            print(f"No download link for subtitle {i}")
+            continue
+
+        sub_response = requests.get(dl_link, timeout=30)
+        os.makedirs(save_path, exist_ok=True)
+        srt_path = os.path.join(save_path, f"subtitles_{i}.srt")
+        with open(srt_path, "wb") as f:
+            f.write(sub_response.content)
+
+        vtt_path = convert_srt_to_vtt(srt_path)
+        if vtt_path:
+            saved.append({"filename": os.path.basename(vtt_path), "label": release})
+            print(f"Saved subtitle {i}: {os.path.basename(vtt_path)}")
+
+    if not saved:
         return False
 
-    if not dl_link:
-        print("No download link found")
-        return False
+    subtitles_json_path = os.path.join(save_path, "subtitles.json")
+    with open(subtitles_json_path, "w", encoding="utf-8") as f:
+        json.dump(saved, f, ensure_ascii=False, indent=2)
 
-    # Downloads subtitle file
-    sub_response = requests.get(dl_link, timeout=30)
-    os.makedirs(save_path, exist_ok=True)
-    srt_path = os.path.join(save_path, "subtitles.srt")
-    with open(srt_path, "wb") as f:
-        f.write(sub_response.content)
-
-    print(f"Subtitle saved to: {srt_path}")
-
-    # Converts to .vtt
-    vtt_path = convert_srt_to_vtt(srt_path)
-    return vtt_path is not None
+    print(f"Saved {len(saved)} subtitles for {movie_name}")
+    return True
 
 
 

@@ -174,7 +174,7 @@ def upsert_movie_from_folder(folder_name):
 
     now = utc_now()
     media_filename = find_media_filename(folder_path)
-    subtitles_filename = "subtitles.vtt" if os.path.exists(os.path.join(folder_path, "subtitles.vtt")) else None
+    subtitles_filename = "subtitles_1.vtt" if os.path.exists(os.path.join(folder_path, "subtitles_1.vtt")) else None
     release_date = metadata.get("release_date") or ""
 
     get_db().execute(

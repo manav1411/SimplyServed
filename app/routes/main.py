@@ -189,13 +189,29 @@ def movie_page(movie_name):
     if not media_filename.lower().endswith(".mp4"):
         return "Unsupported media format. Please request an MP4 copy.", 415
     movie_file = f"/media_library/{movie_name}/{media_filename}"
-    subtitles_file = f"/media_library/{movie_name}/{movie['subtitles_filename']}" if movie["subtitles_filename"] else ""
+
+    subtitles_list = []
+    subtitles_json_path = os.path.join(current_app.config["MEDIA_PATH"], movie_name, "subtitles.json")
+    if os.path.exists(subtitles_json_path):
+        try:
+            with open(subtitles_json_path, encoding="utf-8") as f:
+                subtitles_list = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            pass
+
+    first_subtitle = (
+        f"/media_library/{movie_name}/{subtitles_list[0]['filename']}" if subtitles_list else ""
+    )
+    sub_base = f"/media_library/{movie_name}"
+
     mime_type = "video/mp4"
     return render_template(
         "movie.html",
         movie_name=movie_name,
         movie_file=movie_file,
-        subtitles_file=subtitles_file,
+        subtitles_file=first_subtitle,
+        subtitles_list=subtitles_list,
+        sub_base=sub_base,
         mime_type=mime_type,
     )
 

@@ -4,9 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{{ movie_name }}</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='movie.css') }}?v=45">
+  <link rel="stylesheet" href="{{ url_for('static', filename='movie.css') }}?v=48">
 </head>
-<body data-movie-name="{{ movie_name|e }}">
+<body data-movie-name="{{ movie_name|e }}" data-sub-base="{{ sub_base|e }}">
   <button id="backBtn" aria-label="Go back to homepage">
     <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" fill="#000000" width="60" height="60">
       <g id="SVGRepo_bgCarrier" stroke-width="0"></g>
@@ -28,7 +28,7 @@
     </video>
 
     <div id="loadingSpinner">
-      <p id="loadingText">Please wait a few seconds...</p>
+      <p id="loadingText">loading...</p>
       <svg xmlns="http://www.w3.org/2000/svg" style="margin:auto; background:none; display:block;" width="64px" height="64px" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid">
         <circle class="spinner-ring" cx="50" cy="50" r="32" stroke-width="8" stroke-dasharray="50.26548245743669 50.26548245743669" fill="none" stroke-linecap="round">
           <animateTransform attributeName="transform" type="rotate" repeatCount="indefinite" dur="1s" values="0 50 50;360 50 50" keyTimes="0;1"></animateTransform>
@@ -37,6 +37,23 @@
     </div>
 
     <p id="video-desc" class="visually-hidden">Video player for {{ movie_name }}</p>
+  </div>
+
+  <script id="subtitle-data" type="application/json">{{ subtitles_list | tojson }}</script>
+
+  <div id="sub-panel" class="hidden">
+    <div class="sub-section">
+      <button id="sub-toggle-btn">Subtitles: ON</button>
+    </div>
+    <div class="sub-section">
+      <div class="sub-section-label">Track</div>
+      <div id="sub-list"></div>
+    </div>
+    <div class="sub-section sub-delay-row">
+      <span class="sub-section-label">Delay</span>
+      <input type="number" id="sub-delay-input" step="0.1" value="0" placeholder="0.0">
+      <span class="sub-delay-unit">s</span>
+    </div>
   </div>
 
   <div id="controls" role="group" aria-label="Video player controls">
@@ -76,6 +93,6 @@
     </div>
   </div>
 
-  <script src="{{ url_for('static', filename='movie.js') }}?v=1" defer></script>
+  <script src="{{ url_for('static', filename='movie.js') }}?v=4" defer></script>
 </body>
 </html>
