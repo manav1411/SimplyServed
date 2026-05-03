@@ -1,6 +1,9 @@
+import json
 import os
 import shutil
 import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
 
 import requests
 from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, session, url_for
@@ -16,6 +19,7 @@ from ..state import (
     get_download_by_title,
     get_movie,
     get_movie_by_folder,
+    get_progress,
     list_active_downloads,
     list_movies_for_user,
     sync_media_library,
@@ -27,6 +31,15 @@ from ..utils import download_poster_and_metadata, finalize_movie_folder, normali
 bp = Blueprint("main", __name__)
 MAX_SEARCH_RESULTS = 5
 MAX_TORRENT_ATTEMPTS = 5
+
+_download_executor = ThreadPoolExecutor(max_workers=2)
+
+_controls_info_cache = {"data": None, "ts": 0.0}
+_CONTROLS_CACHE_TTL = 60
+
+
+def _invalidate_controls_cache():
+    _controls_info_cache["data"] = None
 
 
 def safe_media_folder(folder_name):
@@ -138,7 +151,6 @@ def landing_page():
                 flash(str(exc), "error")
         return redirect(url_for("main.landing_page") + "#bottom")
 
-    reconcile_active_downloads()
     searched_movies = []
     for movie in session.get("searched_movies", []):
         state_payload = download_state_payload(movie["id"])
@@ -187,6 +199,75 @@ def movie_page(movie_name):
     )
 
 
+def _run_download_worker(app, tmdb_id, movie_title, folder_name, save_path, requested_by_email, release_date):
+    with app.app_context():
+        try:
+            candidates = JackettClient().search_torrents(movie_title, release_date)
+            if not candidates:
+                shutil.rmtree(save_path, ignore_errors=True)
+                upsert_download(
+                    tmdb_id, movie_title, folder_name, "failed",
+                    requested_by_email=requested_by_email,
+                    error_message="No MP4 torrents found",
+                )
+                return
+
+            qbittorrent = QBittorrentClient()
+            attempted = 0
+            last_error = None
+            for candidate in candidates[:MAX_TORRENT_ATTEMPTS]:
+                attempted += 1
+                torrent = None
+                try:
+                    qbittorrent.add_torrent(candidate["MagnetUri"], save_path)
+                    torrent = qbittorrent.wait_for_torrent(title=movie_title, save_path=save_path)
+                    if not torrent:
+                        last_error = "Torrent was added but could not be found in qBittorrent"
+                        continue
+
+                    torrent_hash = torrent.get("hash")
+                    if qbittorrent.torrent_has_mp4(torrent_hash):
+                        upsert_download(
+                            tmdb_id, movie_title, folder_name, "downloading",
+                            requested_by_email=requested_by_email,
+                            torrent_hash=torrent_hash,
+                            torrent_name=torrent.get("name") or candidate.get("Title"),
+                            progress=torrent.get("progress", 0),
+                            state=torrent.get("state") or "queued",
+                        )
+                        return
+
+                    last_error = f"Torrent did not contain an MP4: {torrent.get('name') or candidate.get('Title')}"
+                    app.logger.info(last_error)
+                    qbittorrent.delete_torrent(torrent_hash)
+                except Exception as candidate_exc:
+                    last_error = str(candidate_exc)
+                    app.logger.warning("Torrent candidate failed for %s: %s", movie_title, candidate_exc)
+                    if torrent and torrent.get("hash"):
+                        try:
+                            qbittorrent.delete_torrent(torrent["hash"])
+                        except Exception as delete_exc:
+                            app.logger.warning("Failed to delete rejected torrent for %s: %s", movie_title, delete_exc)
+
+            error = "No MP4 torrents found"
+            if last_error:
+                error = f"{error} after {attempted} attempts. Last issue: {last_error}"
+            shutil.rmtree(save_path, ignore_errors=True)
+            upsert_download(
+                tmdb_id, movie_title, folder_name, "failed",
+                requested_by_email=requested_by_email,
+                error_message=error,
+            )
+        except Exception as exc:
+            app.logger.exception("Download worker failed for %s: %s", movie_title, exc)
+            shutil.rmtree(save_path, ignore_errors=True)
+            upsert_download(
+                tmdb_id, movie_title, folder_name, "failed",
+                requested_by_email=requested_by_email,
+                error_message=str(exc),
+            )
+
+
 def start_download_for_tmdb(tmdb_id, requested_by_email=None):
     existing_movie = get_movie(tmdb_id)
     if existing_movie and existing_movie["media_filename"]:
@@ -201,97 +282,26 @@ def start_download_for_tmdb(tmdb_id, requested_by_email=None):
         )
         return {"status": "ready", "title": existing_movie["title"]}
 
+    existing_download = get_download(tmdb_id)
+    if existing_download and existing_download["status"] not in {"failed", "ready"}:
+        return {"status": existing_download["status"], "title": existing_download["title"]}
+
     movie_data = TMDbClient().movie_details(tmdb_id)
     movie_title = movie_data["title"]
     folder_name = movie_title
     save_path = os.path.join(current_app.config["MEDIA_PATH"], folder_name)
-    os.makedirs(save_path, exist_ok=True)
     upsert_download(
-        tmdb_id,
-        movie_title,
-        folder_name,
-        "requested",
-        requested_by_email=requested_by_email,
-        progress=0,
-        state="requested",
+        tmdb_id, movie_title, folder_name, "requested",
+        requested_by_email=requested_by_email, progress=0, state="requested",
     )
 
-    try:
-        candidates = JackettClient().search_torrents(movie_title, movie_data.get("release_date"))
-        if not candidates:
-            error = "No MP4 torrents found"
-            upsert_download(
-                tmdb_id,
-                movie_title,
-                folder_name,
-                "failed",
-                requested_by_email=requested_by_email,
-                error_message=error,
-            )
-            return {"error": error}, 404
-
-        qbittorrent = QBittorrentClient()
-        attempted = 0
-        last_error = None
-        for candidate in candidates[:MAX_TORRENT_ATTEMPTS]:
-            attempted += 1
-            torrent = None
-            try:
-                qbittorrent.add_torrent(candidate["MagnetUri"], save_path)
-                torrent = qbittorrent.wait_for_torrent(title=movie_title, save_path=save_path)
-                if not torrent:
-                    last_error = "Torrent was added but could not be found in qBittorrent"
-                    continue
-
-                torrent_hash = torrent.get("hash")
-                if qbittorrent.torrent_has_mp4(torrent_hash):
-                    upsert_download(
-                        tmdb_id,
-                        movie_title,
-                        folder_name,
-                        "downloading",
-                        requested_by_email=requested_by_email,
-                        torrent_hash=torrent_hash,
-                        torrent_name=torrent.get("name") or candidate.get("Title"),
-                        progress=torrent.get("progress", 0),
-                        state=torrent.get("state") or "queued",
-                    )
-                    return {"status": "started", "title": movie_title, "attempts": attempted}
-
-                last_error = f"Torrent did not contain an MP4: {torrent.get('name') or candidate.get('Title')}"
-                current_app.logger.info(last_error)
-                qbittorrent.delete_torrent(torrent_hash)
-            except Exception as candidate_exc:
-                last_error = str(candidate_exc)
-                current_app.logger.warning("Torrent candidate failed for %s: %s", movie_title, candidate_exc)
-                if torrent and torrent.get("hash"):
-                    try:
-                        qbittorrent.delete_torrent(torrent["hash"])
-                    except Exception as delete_exc:
-                        current_app.logger.warning("Failed to delete rejected torrent for %s: %s", movie_title, delete_exc)
-
-        error = "No MP4 torrents found"
-        if last_error:
-            error = f"{error} after {attempted} attempts. Last issue: {last_error}"
-        upsert_download(
-            tmdb_id,
-            movie_title,
-            folder_name,
-            "failed",
-            requested_by_email=requested_by_email,
-            error_message=error,
-        )
-        return {"error": error}, 404
-    except Exception as exc:
-        upsert_download(
-            tmdb_id,
-            movie_title,
-            folder_name,
-            "failed",
-            requested_by_email=requested_by_email,
-            error_message=str(exc),
-        )
-        raise
+    app = current_app._get_current_object()
+    _download_executor.submit(
+        _run_download_worker,
+        app, tmdb_id, movie_title, folder_name, save_path,
+        requested_by_email, movie_data.get("release_date"),
+    )
+    return {"status": "queued", "title": movie_title}
 
 
 @bp.route("/start_download/<int:tmdb_id>", methods=["POST"])
@@ -386,6 +396,8 @@ def download_status(movie_title):
         return jsonify({"progress": download["progress"] or 1, "state": "processing"})
     if download["status"] == "failed":
         return jsonify({"error": download["error_message"] or "Download failed"}), 500
+    if download["status"] == "requested":
+        return jsonify({"progress": 0, "state": "searching"})
 
     try:
         save_path = os.path.join(current_app.config["MEDIA_PATH"], download["folder_name"])
@@ -475,23 +487,41 @@ def cancel_download(tmdb_id):
     delete_download(tmdb_id)
     remove_requested_movie(tmdb_id)
     sync_media_library()
+    _invalidate_controls_cache()
     return jsonify({"status": "cancelled"})
+
+
+def _dir_size(path):
+    total = 0
+    with os.scandir(path) as it:
+        for entry in it:
+            if entry.is_file(follow_symlinks=False):
+                total += entry.stat(follow_symlinks=False).st_size
+            elif entry.is_dir(follow_symlinks=False):
+                total += _dir_size(entry.path)
+    return total
 
 
 @bp.route("/controls_info")
 def controls_info():
+    now = time.monotonic()
+    if _controls_info_cache["data"] is not None and now - _controls_info_cache["ts"] < _CONTROLS_CACHE_TTL:
+        return jsonify(_controls_info_cache["data"])
+
     media_path = current_app.config["MEDIA_PATH"]
     total_size = 0
     folders = []
 
-    for folder in os.listdir(media_path):
-        folder_path = os.path.join(media_path, folder)
-        if os.path.isdir(folder_path):
-            size = sum(os.path.getsize(os.path.join(dp, f)) for dp, _, filenames in os.walk(folder_path) for f in filenames)
-            total_size += size
-            folders.append({"name": folder, "size": round(size / (1024 * 1024), 2)})
+    with os.scandir(media_path) as it:
+        for entry in it:
+            if entry.is_dir(follow_symlinks=False):
+                size = _dir_size(entry.path)
+                total_size += size
+                folders.append({"name": entry.name, "size": round(size / (1024 * 1024), 2)})
 
-    return jsonify({"total_size": round(total_size / (1024 * 1024), 2), "directories": folders})
+    result = {"total_size": round(total_size / (1024 * 1024), 2), "directories": folders}
+    _controls_info_cache.update({"data": result, "ts": now})
+    return jsonify(result)
 
 
 @bp.route("/reset_search", methods=["POST"])
@@ -521,4 +551,27 @@ def delete_folder(folder):
     if movie:
         delete_download(movie["tmdb_id"])
     delete_movie_by_folder(folder)
+    _invalidate_controls_cache()
     return "", 204
+
+
+@bp.route("/movie_card/<int:tmdb_id>")
+def movie_card(tmdb_id):
+    movie_row = get_movie(tmdb_id)
+    if not movie_row:
+        return "", 404
+    genres = json.loads(movie_row["genres_json"] or "[]")
+    progress_seconds = get_progress(request.user_email, movie_row["folder_name"])
+    runtime = movie_row["runtime"] or 0
+    movie = {
+        "name": movie_row["folder_name"],
+        "title": movie_row["title"],
+        "year": movie_row["year"],
+        "overview": movie_row["overview"],
+        "genres": genres,
+        "runtime": runtime,
+        "rating": movie_row["rating"] or 0,
+        "poster": f"/media_library/{movie_row['folder_name']}/poster.jpg" if movie_row["poster_path"] else "",
+        "progress_seconds": progress_seconds,
+    }
+    return render_template("movie_card.html", movie=movie)

@@ -57,6 +57,8 @@ h1 {
 .movies-wrapper {
   display: flex;
   justify-content: center;
+  padding: 0 20px;
+  box-sizing: border-box;
 }
 
 /* Movie grid (media from disk) */
@@ -64,9 +66,10 @@ h1 {
   display: flex;
   flex-wrap: wrap;
   gap: 20px;
-  padding: 0 calc((100vw - 900px - 95px) / 2);
-  box-sizing: border-box;
-  max-width: 100%;
+  flex-basis: 980px;
+  flex-shrink: 1;
+  flex-grow: 0;
+  max-width: 980px;
   justify-content: flex-start;
 }
 
@@ -314,7 +317,12 @@ h1 {
     display: none;
     text-align: center;
     margin-top: 10px;
+    margin-bottom: 10px;
     font-weight: bold;
+}
+
+.search-container {
+    margin: 10px auto 30px; /* 👈 add top margin */
 }
 
 .controls-help {
@@ -410,6 +418,11 @@ progress::-moz-progress-bar {
   border-radius: 25px;
   cursor: pointer;
   z-index: 9999;
+  transition: background 0.2s ease;
+}
+
+#controls-toggle:hover {
+  background: #4a4a4a;
 }
 
 #controls-panel {
@@ -443,6 +456,7 @@ progress::-moz-progress-bar {
 #controls-panel li {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   padding: 6px 0;
 }
 
@@ -453,13 +467,56 @@ progress::-moz-progress-bar {
   padding: 5px 8px;
   border-radius: 25px;
   cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.2s ease;
+}
+
+#controls-panel button:hover {
+  background: #a00;
+}
+
+.delete-confirm {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.delete-confirm .confirm-yes,
+.delete-confirm .confirm-no {
+  border: none;
+  padding: 3px 8px;
+  border-radius: 25px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.2s ease;
+}
+
+.delete-confirm .confirm-yes {
+  background: #c00;
+  color: white;
+}
+
+.delete-confirm .confirm-yes:hover {
+  background: #a00;
+}
+
+.delete-confirm .confirm-no {
+  background: #555;
+  color: white;
+}
+
+.delete-confirm .confirm-no:hover {
+  background: #444;
 }
 
 /* tag bar */
 #tag-filter-wrapper {
-  padding: 0 calc((100vw - 900px - 95px) / 2);
+  max-width: 980px;
+  width: calc(100% - 40px);
+  margin: 8px auto;
   overflow: hidden;
-  margin: 8px 0;
 }
 #tag-filter-container {
   margin: 8px 0;
@@ -506,13 +563,7 @@ progress::-moz-progress-bar {
 
 /* mobile settings */
 @media (max-width: 600px) {
-  
-    .movies {
-      padding: 0 calc((100vw - 300px - 40px) / 2);
-      justify-content: flex-start;
-    }
 
-  
     .movie-block {
     width: 28%;
     min-width: 100px;

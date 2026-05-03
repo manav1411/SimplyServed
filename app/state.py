@@ -13,6 +13,9 @@ def get_db():
     if "db" not in g:
         db = sqlite3.connect(current_app.config["DATABASE_PATH"])
         db.row_factory = sqlite3.Row
+        db.execute("PRAGMA journal_mode=WAL")
+        db.execute("PRAGMA synchronous=NORMAL")
+        db.execute("PRAGMA temp_store=MEMORY")
         g.db = db
     return g.db
 
@@ -233,7 +236,6 @@ def get_movie_by_folder(folder_name):
 
 
 def list_movies_for_user(user_email):
-    sync_media_library()
     rows = get_db().execute("SELECT * FROM movies WHERE media_filename IS NOT NULL ORDER BY title COLLATE NOCASE").fetchall()
     movies = []
     for row in rows:

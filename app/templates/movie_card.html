@@ -1,0 +1,38 @@
+{% set slugs = [] %}
+{% for genre in movie.genres %}
+  {% set _ = slugs.append(genre | lower | replace(' ', '-')) %}
+{% endfor %}
+<div class="movie-block" data-genres-slugs="{{ slugs | join(' ') }}">
+  <div class="movie" tabindex="0" aria-expanded="false" data-movie="{{ movie.name }}">
+    <a href="/movie/{{ movie.name|urlencode }}">
+      {% if movie.poster %}
+      <img src="{{ movie.poster }}" alt="Poster for {{ movie.title }}">
+      {% else %}
+      <div class="missing-poster">No Image</div>
+      {% endif %}
+    </a>
+    <div class="progress-container"
+        data-movie="{{ movie.name }}"
+        data-seconds="{{ movie.progress_seconds }}"
+        data-duration="{{ movie.runtime * 60 }}">
+      <div class="progress-bar"></div>
+    </div>
+  </div>
+
+  <div class="movie-info" data-movie="{{ movie.name }}">
+    <div class="title-year">{{ movie.title }} ({{ movie.year }})</div>
+
+    <div class="genres">
+      {% for genre in movie.genres %}
+        <span class="genre" data-genre-slug="{{ genre | lower | replace(' ', '-') }}">{{ genre }}</span>
+      {% endfor %}
+    </div>
+
+    <div class="runtime-rating">
+      <span class="runtime">{{ movie.runtime }} min</span> ·
+      <span class="rating">⭐ {{ (movie.rating + 0.35) | round(1) }}</span>
+    </div>
+
+    <p class="overview">{{ movie.overview }}</p>
+  </div>
+</div>

@@ -5,6 +5,8 @@ import requests
 
 from ..utils import normalize
 
+_shared_session = requests.Session()
+
 
 class QBittorrentClient:
     def __init__(self, host=None, username=None, password=None, timeout=10):
@@ -12,7 +14,7 @@ class QBittorrentClient:
         self.username = username or os.getenv("QBITTORRENT_USER")
         self.password = password or os.getenv("QBITTORRENT_PASS")
         self.timeout = timeout
-        self.session = requests.Session()
+        self.session = _shared_session
 
     def login(self):
         response = self.session.post(
@@ -23,20 +25,23 @@ class QBittorrentClient:
         if response.status_code != 200 or response.text != "Ok.":
             raise RuntimeError("qBittorrent login failed")
 
+    def _call(self, method, path, **kwargs):
+        url = f"{self.host}{path}"
+        response = getattr(self.session, method)(url, timeout=self.timeout, **kwargs)
+        if response.status_code == 403:
+            self.login()
+            response = getattr(self.session, method)(url, timeout=self.timeout, **kwargs)
+        return response
+
     def add_torrent(self, magnet_uri, save_path):
-        self.login()
-        response = self.session.post(
-            f"{self.host}/api/v2/torrents/add",
-            data={"urls": magnet_uri, "savepath": save_path, "category": "media"},
-            timeout=self.timeout,
-        )
+        response = self._call("post", "/api/v2/torrents/add",
+                              data={"urls": magnet_uri, "savepath": save_path, "category": "media"})
         if response.status_code != 200:
             raise RuntimeError("Failed to add torrent")
 
     def torrents(self, category=None):
-        self.login()
         params = {"category": category} if category else None
-        response = self.session.get(f"{self.host}/api/v2/torrents/info", params=params, timeout=self.timeout)
+        response = self._call("get", "/api/v2/torrents/info", params=params)
         response.raise_for_status()
         return response.json()
 
@@ -55,21 +60,12 @@ class QBittorrentClient:
         return None
 
     def delete_torrent(self, torrent_hash):
-        self.login()
-        response = self.session.post(
-            f"{self.host}/api/v2/torrents/delete",
-            data={"hashes": torrent_hash, "deleteFiles": "true"},
-            timeout=self.timeout,
-        )
+        response = self._call("post", "/api/v2/torrents/delete",
+                              data={"hashes": torrent_hash, "deleteFiles": "true"})
         response.raise_for_status()
 
     def torrent_files(self, torrent_hash):
-        self.login()
-        response = self.session.get(
-            f"{self.host}/api/v2/torrents/files",
-            params={"hash": torrent_hash},
-            timeout=self.timeout,
-        )
+        response = self._call("get", "/api/v2/torrents/files", params={"hash": torrent_hash})
         response.raise_for_status()
         return response.json()
 

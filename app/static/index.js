@@ -8,47 +8,49 @@ document.addEventListener("DOMContentLoaded", () => {
   initializeGenreFilters();
 });
 
+function initializeProgressBar(container) {
+  if (!container) return;
+  const seconds = parseFloat(container.dataset.seconds);
+  const duration = parseFloat(container.dataset.duration);
+  const bar = container.querySelector(".progress-bar");
+  if (bar && duration > 0 && seconds > 0) {
+    bar.style.width = `${Math.min((seconds / duration) * 100, 100)}%`;
+  }
+}
+
 function initializeProgressBars() {
-  document.querySelectorAll(".progress-container").forEach((container) => {
-    const seconds = parseFloat(container.dataset.seconds);
-    const duration = parseFloat(container.dataset.duration);
-    const bar = container.querySelector(".progress-bar");
-    if (bar && duration > 0 && seconds > 0) {
-      bar.style.width = `${Math.min((seconds / duration) * 100, 100)}%`;
+  document.querySelectorAll(".progress-container").forEach(initializeProgressBar);
+}
+
+function initializeMovieCard(movieEl) {
+  if (!movieEl) return;
+  const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+  const link = movieEl.querySelector("a");
+  let tappedOnce = false;
+
+  movieEl.addEventListener("click", (event) => {
+    const expanded = movieEl.getAttribute("aria-expanded") === "true";
+    if (isMobile && !expanded) {
+      event.preventDefault();
+      movieEl.setAttribute("aria-expanded", "true");
+      tappedOnce = true;
+      movieEl.scrollIntoView({ behavior: "smooth", block: "start" });
+      setTimeout(() => { tappedOnce = false; }, 2000);
+      return;
+    }
+    if (isMobile && tappedOnce && link) {
+      window.location.href = link.href;
+      return;
+    }
+    movieEl.setAttribute("aria-expanded", expanded ? "false" : "true");
+    if (!expanded) {
+      movieEl.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   });
 }
 
 function initializeMovieCards() {
-  const isMobile = /Mobi|Android/i.test(navigator.userAgent);
-  document.querySelectorAll(".movie").forEach((movieDiv) => {
-    const link = movieDiv.querySelector("a");
-    let tappedOnce = false;
-
-    movieDiv.addEventListener("click", (event) => {
-      const expanded = movieDiv.getAttribute("aria-expanded") === "true";
-      if (isMobile && !expanded) {
-        event.preventDefault();
-        movieDiv.setAttribute("aria-expanded", "true");
-        tappedOnce = true;
-        movieDiv.scrollIntoView({ behavior: "smooth", block: "start" });
-        setTimeout(() => {
-          tappedOnce = false;
-        }, 2000);
-        return;
-      }
-
-      if (isMobile && tappedOnce && link) {
-        window.location.href = link.href;
-        return;
-      }
-
-      movieDiv.setAttribute("aria-expanded", expanded ? "false" : "true");
-      if (!expanded) {
-        movieDiv.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
-    });
-  });
+  document.querySelectorAll(".movie").forEach(initializeMovieCard);
 }
 
 function initializeGreeting() {
@@ -110,27 +112,106 @@ function initializeRequests() {
     }
 
     statusText.textContent = "Loading...";
-    const poll = setInterval(async () => {
-      const response = await fetch(`/download_status/${encodeURIComponent(title)}`);
-      const data = await response.json();
-      if (!response.ok) {
-        statusText.textContent = data.error || "Download not found";
-        clearInterval(poll);
-        return;
-      }
-
-      progressBar.value = data.progress;
-      statusText.textContent = `${(data.progress * 100).toFixed(1)}% - ${data.state}`;
-      if (data.state === "processing") {
-        statusText.textContent = "Processing...";
-      }
-      if (data.progress >= 1.0 && data.state === "ready") {
-        clearInterval(poll);
-        div.remove();
-        window.location.reload();
-      }
-    }, 3000);
+    startPolling(div, tmdbId, title, progressBar, statusText);
   });
+}
+
+function pollIntervalMs(elapsedSeconds) {
+  if (elapsedSeconds < 60) return 3000;
+  if (elapsedSeconds < 300) return 5000;
+  return 10000;
+}
+
+function startPolling(div, tmdbId, title, progressBar, statusText) {
+  let elapsedSeconds = 0;
+  const HARD_STOP_SECONDS = 30 * 60;
+
+  async function tick() {
+    if (elapsedSeconds >= HARD_STOP_SECONDS) {
+      statusText.textContent = "Stalled — check qBittorrent";
+      return;
+    }
+
+    let data, ok;
+    try {
+      const response = await fetch(`/download_status/${encodeURIComponent(title)}`);
+      data = await response.json();
+      ok = response.ok;
+    } catch {
+      statusText.textContent = "Connection error, retrying...";
+      const ms = pollIntervalMs(elapsedSeconds);
+      elapsedSeconds += ms / 1000;
+      setTimeout(tick, ms);
+      return;
+    }
+
+    if (!ok) {
+      statusText.textContent = data.error || "Download not found";
+      return;
+    }
+
+    progressBar.value = data.progress;
+    if (data.state === "processing") {
+      statusText.textContent = "Processing...";
+    } else if (data.state === "searching") {
+      statusText.textContent = "Searching for torrent...";
+    } else {
+      statusText.textContent = `${(data.progress * 100).toFixed(1)}% - ${data.state}`;
+    }
+
+    if (data.progress >= 1.0 && data.state === "ready") {
+      div.remove();
+      addMovieCard(tmdbId);
+      return;
+    }
+
+    const ms = pollIntervalMs(elapsedSeconds);
+    elapsedSeconds += ms / 1000;
+    setTimeout(tick, ms);
+  }
+
+  const initialMs = pollIntervalMs(0);
+  elapsedSeconds += initialMs / 1000;
+  setTimeout(tick, initialMs);
+}
+
+async function addMovieCard(tmdbId) {
+  try {
+    const response = await fetch(`/movie_card/${tmdbId}`);
+    if (!response.ok) { window.location.reload(); return; }
+    const html = await response.text();
+    const moviesDiv = document.querySelector(".movies");
+    if (!moviesDiv) { window.location.reload(); return; }
+
+    const temp = document.createElement("div");
+    temp.innerHTML = html.trim();
+    const card = temp.firstElementChild;
+    if (!card) { window.location.reload(); return; }
+
+    // Ensure CSS filter rules exist for any new genres on this card
+    const slugs = (card.dataset.genresSlugs || "").split(" ").filter(Boolean);
+    if (slugs.length) {
+      let styleEl = document.getElementById("genre-filter-rules");
+      if (!styleEl) {
+        styleEl = document.createElement("style");
+        styleEl.id = "genre-filter-rules";
+        document.head.appendChild(styleEl);
+      }
+      slugs.forEach((slug) => {
+        if (!styleEl.textContent.includes(`.filter-${slug}`)) {
+          styleEl.textContent += `.filter-${slug} .movie-block:not([data-genres-slugs~="${slug}"]) { display: none; }\n`;
+          styleEl.textContent += `.filter-${slug} .genre[data-genre-slug="${slug}"] { background-color: #cbcbcb; color: #000; }\n`;
+        }
+      });
+    }
+
+    moviesDiv.appendChild(card);
+    initializeMovieCard(card.querySelector(".movie"));
+    initializeProgressBar(card.querySelector(".progress-container"));
+    attachGenreSpanListeners(card.querySelectorAll(".movie-info .genre"));
+  } catch {
+    window.location.reload();
+  }
 }
 
 function initializeControlsPanel() {
@@ -138,37 +219,83 @@ function initializeControlsPanel() {
   const panel = document.getElementById("controls-panel");
   if (!toggleBtn || !panel) return;
 
+  let cachedData = null;
+
+  function renderControlsData(data) {
+    cachedData = data;
+    document.getElementById("storage-info").innerHTML =
+      `<div style="text-align: center; font-size: 1.5em; font-weight: bold;">Library size: ${(data.total_size / 1024).toFixed(2)} GB</div>`;
+    const ul = document.getElementById("media-directories");
+    ul.innerHTML = "";
+    data.directories.forEach((dir) => {
+      const li = document.createElement("li");
+      li.innerHTML = `<span>${dir.name} (${(dir.size / 1024).toFixed(2)} GB)</span><button class="delete-btn" data-folder="${dir.name}">Delete</button>`;
+      ul.appendChild(li);
+    });
+  }
+
+  function fetchControlsInfo() {
+    return fetch("/controls_info").then((r) => r.json()).then(renderControlsData);
+  }
+
+  // Pre-fetch so data is ready before the user opens the panel
+  setTimeout(() => {
+    fetch("/controls_info").then((r) => r.json()).then((data) => { cachedData = data; }).catch(() => {});
+  }, 1500);
+
   toggleBtn.addEventListener("click", () => {
     panel.classList.toggle("hidden");
     if (panel.classList.contains("hidden")) return;
 
-    fetch("/controls_info")
-      .then((res) => res.json())
-      .then((data) => {
-        document.getElementById("storage-info").innerHTML =
-          `<div style="text-align: center; font-size: 1.5em; font-weight: bold;">Library size: ${(data.total_size / 1024).toFixed(2)} GB</div>`;
-
-        const ul = document.getElementById("media-directories");
-        ul.innerHTML = "";
-        data.directories.forEach((dir) => {
-          const li = document.createElement("li");
-          li.innerHTML = `<span>${dir.name} (${(dir.size / 1024).toFixed(2)} GB)</span><button data-folder="${dir.name}">Delete</button>`;
-          ul.appendChild(li);
-        });
+    if (cachedData) {
+      renderControlsData(cachedData);
+      // Silently refresh in background in case library changed
+      fetchControlsInfo().catch(() => {});
+    } else {
+      fetchControlsInfo().catch(() => {
+        document.getElementById("storage-info").textContent = "Failed to load storage info";
       });
-  });
-
-  document.getElementById("reset-search-btn").addEventListener("click", () => {
-    fetch("/reset_search", { method: "POST" }).then(() => location.reload());
-  });
-
-  document.getElementById("media-directories").addEventListener("click", (event) => {
-    if (event.target.tagName !== "BUTTON") return;
-    const folder = event.target.getAttribute("data-folder");
-    if (confirm(`Delete ${folder}?`)) {
-      fetch(`/delete_folder/${encodeURIComponent(folder)}`, { method: "POST" }).then(() => location.reload());
     }
   });
+
+  // Close when clicking outside the panel or toggle button
+  document.addEventListener("click", (event) => {
+    if (panel.classList.contains("hidden")) return;
+    if (!panel.contains(event.target) && !toggleBtn.contains(event.target)) {
+      panel.classList.add("hidden");
+    }
+  });
+
+  // Inline delete confirmation
+  document.getElementById("media-directories").addEventListener("click", (event) => {
+    const deleteBtn = event.target.closest(".delete-btn");
+    if (!deleteBtn) return;
+    const folder = deleteBtn.dataset.folder;
+    const li = deleteBtn.closest("li");
+
+    deleteBtn.hidden = true;
+    const confirmEl = document.createElement("span");
+    confirmEl.className = "delete-confirm";
+    confirmEl.innerHTML = `Sure? <button class="confirm-yes">Yes</button><button class="confirm-no">No</button>`;
+    li.appendChild(confirmEl);
+
+    confirmEl.querySelector(".confirm-no").addEventListener("click", () => {
+      confirmEl.remove();
+      deleteBtn.hidden = false;
+    });
+
+    confirmEl.querySelector(".confirm-yes").addEventListener("click", () => {
+      confirmEl.innerHTML = "<em>Deleting...</em>";
+      fetch(`/delete_folder/${encodeURIComponent(folder)}`, { method: "POST" }).then(() => location.reload());
+    });
+  });
+
+  const resetBtn = document.getElementById("reset-search-btn");
+  if (resetBtn) {
+    resetBtn.addEventListener("click", () => {
+      fetch("/reset_search", { method: "POST" }).then(() => location.reload());
+    });
+  }
 }
 
 function initializeSearchForm() {
@@ -183,43 +310,49 @@ function initializeSearchForm() {
   });
 }
 
-function initializeGenreFilters() {
-  const tags = document.querySelectorAll(".tag-filter");
-  const movies = document.querySelectorAll(".movie-block");
-  const genresInMovies = document.querySelectorAll(".movie-info .genre");
-
-  function filterMoviesByGenre(selected) {
-    movies.forEach((movie) => {
-      const genres = Array.from(movie.querySelectorAll(".genre")).map((el) => el.textContent.trim());
-      movie.style.display = selected === "all" || genres.includes(selected) ? "block" : "none";
-    });
+function applyGenreFilter(slug) {
+  document.body.className = document.body.className.replace(/\bfilter-\S+/g, "").trim();
+  if (slug && slug !== "all") {
+    document.body.classList.add(`filter-${slug}`);
   }
+}
 
-  tags.forEach((tag) => {
-    tag.addEventListener("click", () => {
-      const selected = tag.dataset.tag;
-      const isActive = tag.classList.contains("active");
-      tags.forEach((item) => item.classList.remove("active"));
-      if (isActive) {
-        filterMoviesByGenre("all");
-      } else {
-        tag.classList.add("active");
-        filterMoviesByGenre(selected);
-      }
-    });
-  });
-
-  genresInMovies.forEach((genreSpan) => {
+function attachGenreSpanListeners(spans) {
+  spans.forEach((genreSpan) => {
     genreSpan.style.cursor = "pointer";
     genreSpan.addEventListener("click", () => {
       const selectedGenre = genreSpan.textContent.trim();
-      const correspondingTag = Array.from(tags).find((tag) => tag.dataset.tag === selectedGenre);
+      const slug = selectedGenre.toLowerCase().replace(/ /g, "-");
+      const tags = document.querySelectorAll(".tag-filter");
       tags.forEach((tag) => tag.classList.remove("active"));
-      if (correspondingTag) {
-        correspondingTag.classList.add("active");
+      if (document.body.classList.contains(`filter-${slug}`)) {
+        applyGenreFilter("all");
+        return;
       }
-      filterMoviesByGenre(selectedGenre);
+      const correspondingTag = Array.from(tags).find((tag) => tag.dataset.slug === slug);
+      if (correspondingTag) correspondingTag.classList.add("active");
+      applyGenreFilter(slug);
       document.getElementById("tag-filter-wrapper").scrollIntoView({ behavior: "smooth" });
     });
   });
+}
+
+function initializeGenreFilters() {
+  const tags = document.querySelectorAll(".tag-filter");
+
+  tags.forEach((tag) => {
+    tag.addEventListener("click", () => {
+      const slug = tag.dataset.slug || "all";
+      const isActive = tag.classList.contains("active");
+      tags.forEach((item) => item.classList.remove("active"));
+      if (isActive) {
+        applyGenreFilter("all");
+      } else {
+        tag.classList.add("active");
+        applyGenreFilter(slug);
+      }
+    });
+  });
+
+  attachGenreSpanListeners(document.querySelectorAll(".movie-info .genre"));
 }

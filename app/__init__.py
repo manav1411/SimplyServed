@@ -1,3 +1,6 @@
+import threading
+import time
+
 from dotenv import load_dotenv
 from flask import Flask
 import os
@@ -37,5 +40,18 @@ def create_app():
     app.register_blueprint(main.bp)
     app.register_blueprint(media.bp)
     app.register_blueprint(progress.bp)
+
+    from .routes.main import reconcile_active_downloads
+
+    def _reconcile_loop():
+        while True:
+            try:
+                with app.app_context():
+                    reconcile_active_downloads()
+            except Exception:
+                app.logger.exception("reconcile loop failed")
+            time.sleep(8)
+
+    threading.Thread(target=_reconcile_loop, daemon=True).start()
 
     return app

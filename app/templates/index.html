@@ -1,9 +1,24 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <link rel="stylesheet" href="{{ url_for('static', filename='global.css') }}?v=135">
+    <link rel="stylesheet" href="{{ url_for('static', filename='global.css') }}?v=136">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SimplyServed</title>
+    {% set genre_slugs = [] %}
+    {% for movie in movies %}
+      {% for genre in movie.genres %}
+        {% set slug = genre | lower | replace(' ', '-') %}
+        {% if slug not in genre_slugs %}{% set _ = genre_slugs.append(slug) %}{% endif %}
+      {% endfor %}
+    {% endfor %}
+    {% if genre_slugs %}
+    <style id="genre-filter-rules">
+      {% for slug in genre_slugs %}
+      .filter-{{ slug }} .movie-block:not([data-genres-slugs~="{{ slug }}"]) { display: none; }
+      .filter-{{ slug }} .genre[data-genre-slug="{{ slug }}"] { background-color: #cbcbcb; color: #000; }
+      {% endfor %}
+    </style>
+    {% endif %}
 </head>
 <body data-user-name="{{ user_name|e }}">
   <div class="main-container">
@@ -21,7 +36,7 @@
 
     <div id="tag-filter-wrapper">
       <div id="tag-filter-container">
-        <span class="tag-filter" data-tag="all">All</span>
+        <span class="tag-filter" data-tag="all" data-slug="all">All</span>
         {% set all_genres = [] %}
         {% for movie in movies %}
           {% for genre in movie.genres %}
@@ -31,7 +46,7 @@
           {% endfor %}
         {% endfor %}
         {% for genre in all_genres %}
-          <span class="tag-filter" data-tag="{{ genre }}">{{ genre }}</span>
+          <span class="tag-filter" data-tag="{{ genre }}" data-slug="{{ genre | lower | replace(' ', '-') }}">{{ genre }}</span>
         {% endfor %}
       </div>
     </div>
@@ -39,7 +54,11 @@
     <div class="movies-wrapper">
       <div class="movies">
         {% for movie in movies %}
-        <div class="movie-block">
+        {% set slugs = [] %}
+        {% for genre in movie.genres %}
+          {% set _ = slugs.append(genre | lower | replace(' ', '-')) %}
+        {% endfor %}
+        <div class="movie-block" data-genres-slugs="{{ slugs | join(' ') }}">
           <div class="movie" tabindex="0" aria-expanded="false" data-movie="{{ movie.name }}">
             <a href="/movie/{{ movie.name|urlencode }}">
               {% if movie.poster %}
@@ -61,7 +80,7 @@
 
             <div class="genres">
               {% for genre in movie.genres %}
-                <span class="genre">{{ genre }}</span>
+                <span class="genre" data-genre-slug="{{ genre | lower | replace(' ', '-') }}">{{ genre }}</span>
               {% endfor %}
             </div>
 
@@ -78,12 +97,12 @@
     </div>
 
     <div class="search-wrapper {{ 'bottom-search' if searched_movies|length == 0 else 'top-search' }}">
+      <div class="search-status">Searching for your movie...</div>
       <div class="search-container">
         <form method="POST" action="/">
           <input type="text" name="query" placeholder="request a movie..." required>
           <button type="submit">Request</button>
         </form>
-        <div class="search-status">Searching for your movie...</div>
       </div>
 
       {% if searched_movies|length > 0 %}
@@ -118,20 +137,21 @@
       {% endif %}
     </div>
 
-    {% if is_admin %}
+    <!-- {% if is_admin %} NOTE: Add this if you only want admin to see this stuff -->
       <div id="controls-toggle">⚙️ Controls</div>
       <div id="controls-panel" class="hidden">
         <div id="storage-info">Loading...</div>
         <ul id="media-directories"></ul>
-        <p class="controls-help">
+        
+        <!-- <p class="controls-help">    NOTE: legacy button for legacy issue. here for reference.
           If torrent(s) are failing to cancel, when ONLY those torrents are in the requests section,
           <button id="reset-search-btn">Click Here</button>
-        </p>
+        </p> -->
       </div>
-    {% endif %}
+    <!-- {% endif %} -->
     <div id="bottom"></div>
   </div>
 
-  <script src="{{ url_for('static', filename='index.js') }}?v=1" defer></script>
+  <script src="{{ url_for('static', filename='index.js') }}?v=6" defer></script>
 </body>
 </html>
