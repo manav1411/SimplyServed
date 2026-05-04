@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SimplyServed — Admin</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}?v=1">
+</head>
+<body>
+  <div class="admin-container">
+    <div class="admin-header">
+      <a href="/" class="back-link">← Back</a>
+      <h1>Admin</h1>
+      <span id="refresh-time" class="refresh-time"></span>
+    </div>
+
+    <div id="loading" class="loading">Loading...</div>
+
+    <div id="content" class="hidden">
+
+      <section class="admin-section">
+        <h2>Online Now</h2>
+        <div id="online-users"></div>
+      </section>
+
+      <section class="admin-section">
+        <h2>Users</h2>
+        <div id="users-list"></div>
+      </section>
+
+      <section class="admin-section">
+        <h2>Downloads</h2>
+        <div id="downloads-list"></div>
+      </section>
+
+    </div>
+  </div>
+  <script src="{{ url_for('static', filename='admin.js') }}?v=1" defer></script>
+</body>
+</html>

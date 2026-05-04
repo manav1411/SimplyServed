@@ -20,12 +20,6 @@ def create_app():
     app.config['MEDIA_PATH'] = media_path
     app.config['PROGRESS_PATH'] = progress_path
     app.config['DATABASE_PATH'] = os.getenv("DATABASE_PATH") or database_path
-    app.config['ADMIN_EMAILS'] = {
-        email.strip().lower()
-        for email in (os.getenv("ADMIN_EMAILS") or "").split(",")
-        if email.strip()
-    }
-
     from .state import close_db, init_db, migrate_progress_json, sync_media_library
     app.teardown_appcontext(close_db)
     with app.app_context():

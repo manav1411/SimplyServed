@@ -4,11 +4,11 @@ import shutil
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta, timezone
 
 import requests
 from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, session, url_for
 
-from ..auth import require_admin
 from ..services.jackett import JackettClient
 from ..services.qbittorrent import QBittorrentClient
 from ..services.tmdb import TMDbClient
@@ -67,10 +67,7 @@ def remove_requested_movie(tmdb_id):
 
 
 def can_cancel_download(download):
-    return (
-        getattr(request, "is_admin", False)
-        or (download["requested_by_email"] and download["requested_by_email"].lower() == request.user_email.lower())
-    )
+    return True
 
 
 def reconcile_active_downloads():
@@ -167,7 +164,6 @@ def landing_page():
     return render_template(
         "index.html",
         user_name=request.user_name,
-        is_admin=getattr(request, "is_admin", False),
         movies=list_movies_for_user(request.user_email),
         searched_movies=searched_movies,
     )
@@ -543,7 +539,6 @@ def controls_info():
 
 @bp.route("/reset_search", methods=["POST"])
 def reset_search():
-    require_admin()
     session["searched_movies"] = []
     session.modified = True
     return "", 204
@@ -551,7 +546,6 @@ def reset_search():
 
 @bp.route("/delete_folder/<folder>", methods=["POST"])
 def delete_folder(folder):
-    require_admin()
     folder_path = safe_media_folder(folder)
     if not folder_path or not os.path.isdir(folder_path):
         return "Folder not found", 404
@@ -613,6 +607,140 @@ def settings_stats():
         "total_movies": total_movies,
         "requests_made": requests_made,
         "top_genres": top_genres,
+    })
+
+
+@bp.route("/admin")
+def admin_page():
+    return render_template("admin.html")
+
+
+@bp.route("/admin/data")
+def admin_data():
+    db = get_db()
+    now_utc = datetime.now(timezone.utc)
+    active_threshold = timedelta(minutes=5)
+
+    users = db.execute("SELECT * FROM users ORDER BY last_seen_at DESC").fetchall()
+    user_list = []
+    for u in users:
+        email = u["email"]
+
+        try:
+            last_seen = datetime.fromisoformat(u["last_seen_at"])
+            if last_seen.tzinfo is None:
+                last_seen = last_seen.replace(tzinfo=timezone.utc)
+            is_active = (now_utc - last_seen) < active_threshold
+        except Exception:
+            is_active = False
+
+        total_seconds = float(db.execute(
+            "SELECT COALESCE(SUM(seconds), 0) as t FROM playback_progress WHERE user_email = ?",
+            (email,),
+        ).fetchone()["t"])
+
+        movies_started = db.execute(
+            "SELECT COUNT(*) as c FROM playback_progress WHERE user_email = ? AND seconds > 60",
+            (email,),
+        ).fetchone()["c"]
+
+        requests_made = db.execute(
+            "SELECT COUNT(*) as c FROM downloads WHERE requested_by_email = ?",
+            (email,),
+        ).fetchone()["c"]
+
+        currently_watching = None
+        latest_progress = db.execute(
+            """
+            SELECT pp.movie_key, pp.updated_at, m.title
+            FROM playback_progress pp
+            LEFT JOIN movies m ON m.folder_name = pp.movie_key
+            WHERE pp.user_email = ?
+            ORDER BY pp.updated_at DESC
+            LIMIT 1
+            """,
+            (email,),
+        ).fetchone()
+        if is_active and latest_progress:
+            try:
+                prog_updated = datetime.fromisoformat(latest_progress["updated_at"])
+                if prog_updated.tzinfo is None:
+                    prog_updated = prog_updated.replace(tzinfo=timezone.utc)
+                if (now_utc - prog_updated) < active_threshold:
+                    currently_watching = latest_progress["title"] or latest_progress["movie_key"]
+            except Exception:
+                pass
+
+        progress_rows = db.execute(
+            """
+            SELECT pp.movie_key, pp.seconds, pp.updated_at, m.title, m.runtime
+            FROM playback_progress pp
+            LEFT JOIN movies m ON m.folder_name = pp.movie_key
+            WHERE pp.user_email = ?
+            ORDER BY pp.updated_at DESC
+            """,
+            (email,),
+        ).fetchall()
+
+        progress = []
+        for r in progress_rows:
+            runtime_sec = (r["runtime"] or 0) * 60
+            pct = round(min(r["seconds"] / runtime_sec * 100, 100)) if runtime_sec > 0 else 0
+            progress.append({
+                "movie_key": r["movie_key"],
+                "title": r["title"] or r["movie_key"],
+                "seconds": round(r["seconds"]),
+                "runtime_seconds": runtime_sec,
+                "percent": pct,
+                "updated_at": r["updated_at"],
+            })
+
+        user_list.append({
+            "email": email,
+            "name": u["display_name"] or email.split("@")[0],
+            "created_at": u["created_at"],
+            "last_seen_at": u["last_seen_at"],
+            "is_active": is_active,
+            "currently_watching": currently_watching,
+            "total_hours": round(total_seconds / 3600, 1),
+            "movies_started": movies_started,
+            "requests_made": requests_made,
+            "progress": progress,
+        })
+
+    download_rows = db.execute(
+        """
+        SELECT d.title, d.status, d.progress, d.state, d.error_message,
+               d.requested_by_email, d.created_at, d.updated_at,
+               u.display_name as requester_name
+        FROM downloads d
+        LEFT JOIN users u ON u.email = d.requested_by_email
+        ORDER BY d.updated_at DESC
+        LIMIT 30
+        """
+    ).fetchall()
+
+    downloads = []
+    for d in download_rows:
+        downloads.append({
+            "title": d["title"],
+            "status": d["status"],
+            "progress": d["progress"],
+            "state": d["state"],
+            "error_message": d["error_message"],
+            "requested_by": d["requester_name"] or (d["requested_by_email"] or "").split("@")[0],
+            "created_at": d["created_at"],
+            "updated_at": d["updated_at"],
+        })
+
+    total_movies = db.execute(
+        "SELECT COUNT(*) as c FROM movies WHERE media_filename IS NOT NULL"
+    ).fetchone()["c"]
+
+    return jsonify({
+        "users": user_list,
+        "downloads": downloads,
+        "library": {"total_movies": total_movies},
     })
 
 

@@ -65,19 +65,19 @@ function initializeGreeting() {
 
   const name = document.body.dataset.userName || "there";
   const hour = new Date().getHours();
-  const avatars = ["🎬", "🍿", "🎥", "🌌", "🛸", "🤖", "🧙‍♂️"];
+  const avatars = ["🎬", "🍿", "🎥", "🌌", "🎞️", "🤖", "🧙‍♂️"];
   const randomAvatar = avatars[Math.floor(Math.random() * avatars.length)];
   const safeName = name.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const emojiSpan = `<span id="greeting-emoji">${randomAvatar}</span>`;
 
   if (hour >= 0 && hour < 5) {
-    greeting.innerHTML = `bit late for a movie innit, ${safeName}? ${emojiSpan}`;
+    greeting.innerHTML = `bit late for a movie innit ${safeName}? ${emojiSpan}`;
   } else {
     let timeOfDay = "Hello";
     if (hour < 12) timeOfDay = "Good morning";
     else if (hour < 18) timeOfDay = "Good afternoon";
     else timeOfDay = "Good evening";
-    greeting.innerHTML = `${timeOfDay}, ${safeName} ${emojiSpan}`;
+    greeting.innerHTML = `${timeOfDay} ${safeName} ${emojiSpan}`;
   }
 }
 
